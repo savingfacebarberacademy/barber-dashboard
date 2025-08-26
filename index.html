@@ -1155,7 +1155,8 @@
         
         function parseCSV(csvText) {
             console.log('Parsing CSV data...');
-            const lines = csvText.trim().split('\n');
+            // Handle different line endings (Windows \r\n, Mac \r, Unix \n)
+            const lines = csvText.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
             console.log('CSV lines:', lines.length);
             
             if (lines.length < 2) {
@@ -1171,7 +1172,7 @@
             
             for (let i = 1; i < lines.length; i++) {
                 const line = lines[i].trim();
-                if (!line) continue;
+                if (!line) continue; // Skip empty lines
                 
                 const values = line.split(',').map(function(v) {
                     return v.trim().replace(/"/g, '');
