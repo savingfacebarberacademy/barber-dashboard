@@ -1,4 +1,27 @@
-<!DOCTYPE html>
+}
+        }
+        
+        function loadCSVData() {
+            // Try to load barber-data.csv from the repository
+            fetch('./barber-data.csv')
+                .then(function(response) {
+                    if (!response.ok) {
+                        throw new Error('CSV file not found. Please upload barber-data.csv to your repository.');
+                    }
+                    return response.text();
+                })
+                .then(function(csvText) {
+                    parseCSV(csvText);
+                    console.log('Data loaded successfully');
+                })
+                .catch(function(error) {
+                    console.log('Could not load CSV file:', error.message);
+                    // Don't show error to regular users, only in console
+                    if (isAdmin) {
+                        alert('Could not load CSV file. Make sure barber-data.csv is uploaded to your repository.');
+                    }
+                });
+        }<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -15,23 +38,28 @@
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: linear-gradient(135deg, #272727 0%, #EFEFEF 100%);
             min-height: 100vh;
-            padding: 20px;
+            padding: 10px;
+            margin: 0;
+            position: relative;
+            overflow-x: auto;
         }
         
         .login-screen {
             display: block;
-            position: fixed;
+            position: absolute;
             z-index: 2000;
             left: 0;
             top: 0;
             width: 100%;
-            height: 100%;
+            min-height: 100vh;
             background: linear-gradient(135deg, #272727 0%, #EFEFEF 100%);
+            padding: 20px;
+            box-sizing: border-box;
         }
         
         .login-container {
             background: #EFEFEF;
-            margin: 10% auto;
+            margin: 20px auto;
             padding: 0;
             border: 3px solid #FFF7EC;
             border-radius: 15px;
@@ -130,6 +158,30 @@
             margin-bottom: 15px;
         }
         
+        .data-paste-area {
+            width: 100%;
+            height: 200px;
+            padding: 15px;
+            border: 2px solid #272727;
+            border-radius: 8px;
+            background: #EFEFEF;
+            color: #272727;
+            font-family: monospace;
+            font-size: 0.9em;
+            resize: vertical;
+            box-sizing: border-box;
+        }
+        
+        .paste-instructions {
+            background: #FFF7EC;
+            border: 2px solid #FFC956;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+            color: #272727;
+            font-size: 0.9em;
+        }
+        
         .container {
             max-width: 1200px;
             margin: 0 auto;
@@ -170,6 +222,7 @@
             padding: 20px 30px;
             border-bottom: 2px solid #FFC956;
             text-align: center;
+            display: none;
         }
         
         .upload-area {
@@ -663,6 +716,12 @@
                     </div>
                     <button id="adminBtn" class="login-btn">Admin Login</button>
                 </div>
+                
+                <div class="admin-panel" id="loadDataPanel">
+                    <h4>📊 Load Data from CSV File</h4>
+                    <p style="margin-bottom: 15px; color: #272727;">Make sure you've uploaded 'barber-data.csv' to your GitHub repository</p>
+                    <button id="loadDataBtn" class="login-btn">Load Latest Data</button>
+                </div>
             </div>
         </div>
     </div>
@@ -844,7 +903,7 @@
         // DOM elements
         let loginScreen, mainDashboard, uploadSection, barberSelector, fileInput, uploadArea;
         let loginName, loginPassword, loginBtn, adminPassword, adminBtn, loginError, logoutBtn;
-        let leaderboardBtn, leaderboardModal;
+        let leaderboardBtn, leaderboardModal, loadDataBtn;
         
         // Initialize everything when page loads
         document.addEventListener('DOMContentLoaded', function() {
@@ -874,6 +933,9 @@
             // Leaderboard elements
             leaderboardBtn = document.getElementById('leaderboardBtn');
             leaderboardModal = document.getElementById('leaderboardModal');
+            
+            // Data loading
+            loadDataBtn = document.getElementById('loadDataBtn');
         }
         
         function setupEventListeners() {
@@ -883,6 +945,10 @@
             if (loginBtn) loginBtn.addEventListener('click', handleLogin);
             if (adminBtn) adminBtn.addEventListener('click', handleAdminLogin);
             if (logoutBtn) logoutBtn.addEventListener('click', handleLogout);
+            if (loadDataBtn) loadDataBtn.addEventListener('click', loadCSVData);
+            
+            // Try to load data automatically on page load
+            loadCSVData();
             
             // Enter key support
             if (loginPassword) {
@@ -1045,6 +1111,7 @@
             if (loginName) loginName.value = '';
             if (loginPassword) loginPassword.value = '';
             if (adminPassword) adminPassword.value = '';
+            checkLoginForm();
             checkLoginForm();
             
             const noDataMsg = document.getElementById('noDataMessage');
