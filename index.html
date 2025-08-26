@@ -5,26 +5,115 @@
             const csvStatus = document.getElementById('csvStatus');
             if (csvStatus) csvStatus.textContent = 'Loading...';
             
+            console.log('Attempting to load CSV file...');
+            
             // Try to load barber-data.csv from the repository
             fetch('./barber-data.csv?t=' + new Date().getTime()) // Add timestamp to prevent caching
                 .then(function(response) {
+                    console.log('Fetch response status:', response.status);
+                    console.log('Fetch response headers:', response.headers);
+                    
+                    if (csvStatus) csvStatus.textContent = 'Received response (Status: ' + response.status + ')';
+                    
                     if (!response.ok) {
                         throw new Error('CSV file not found (Status: ' + response.status + ')');
                     }
                     return response.text();
                 })
                 .then(function(csvText) {
+                    console.log('CSV text received, length:', csvText.length);
+                    console.log('First 200 characters:', csvText.substring(0, 200));
+                    
                     if (csvStatus) csvStatus.textContent = 'Found CSV file, parsing data...';
+                    
+                    if (!csvText || csvText.trim().length === 0) {
+                        throw new Error('CSV file is empty');
+                    }
+                    
                     parseCSV(csvText);
-                    if (csvStatus) csvStatus.textContent = 'Data loaded successfully! (' + barberData.length + ' records)';
+                    
+                    if (csvStatus) csvStatus.textContent = 'Success! Loaded ' + barberData.length + ' records';
                     console.log('Data loaded successfully:', barberData.length, 'records');
                 })
                 .catch(function(error) {
                     console.error('CSV loading error:', error);
                     if (csvStatus) csvStatus.textContent = 'Error: ' + error.message;
-                    if (isAdmin) {
-                        alert('Could not load CSV file: ' + error.message);
+                    
+                    // Try alternative methods
+                    console.log('Trying alternative fetch method...');
+                    tryAlternativeFetch();
+                });
+        }
+        
+        function tryAlternativeFetch() {
+            // Try fetching with different approaches
+            const alternatives = [
+                'barber-data.csv',
+                './barber-data.csv',
+                '/barber-dashboard/barber-data.csv'
+            ];
+            
+            function tryNext(index) {
+                if (index >= alternatives.length) {
+                    alert('Could not load CSV file. Please check:\n1. File is named exactly "barber-data.csv"\n2. File is in the root of your repository\n3. GitHub Pages is properly deployed');
+                    return;
+                }
+                
+                const url = alternatives[index];
+                console.log('Trying URL:', url);
+                
+                fetch(url + '?t=' + new Date().getTime())
+                    .then(function(response) {
+                        if (response.ok) {
+                            return response.text();
+                        }
+                        throw new Error('Status: ' + response.status);
+                    })
+                    .then(function(csvText) {
+                        console.log('Success with URL:', url);
+                        parseCSV(csvText);
+                        const csvStatus = document.getElementById('csvStatus');
+                        if (csvStatus) csvStatus.textContent = 'Success! Loaded ' + barberData.length + ' records';
+                    })
+                    .catch(function(error) {
+                        console.log('Failed with URL:', url, error.message);
+                        tryNext(index + 1);
+                    });
+            }
+            
+            tryNext(0);
+        }
+        
+        function testCsvAccess() {
+            const debugInfo = document.getElementById('debugInfo');
+            if (debugInfo) {
+                debugInfo.style.display = 'block';
+                debugInfo.textContent = 'Testing CSV file access...\n';
+            }
+            
+            // Test direct access to the CSV
+            const testUrl = window.location.href.replace('/barber-dashboard/', '/barber-dashboard/barber-data.csv');
+            debugInfo.textContent += 'Current page URL: ' + window.location.href + '\n';
+            debugInfo.textContent += 'Trying CSV URL: ' + testUrl + '\n';
+            
+            fetch(testUrl)
+                .then(function(response) {
+                    debugInfo.textContent += 'Response status: ' + response.status + '\n';
+                    debugInfo.textContent += 'Response headers: ' + JSON.stringify([...response.headers.entries()]) + '\n';
+                    
+                    if (response.ok) {
+                        return response.text();
                     }
+                    throw new Error('HTTP ' + response.status);
+                })
+                .then(function(text) {
+                    debugInfo.textContent += 'CSV file loaded successfully!\n';
+                    debugInfo.textContent += 'File length: ' + text.length + ' characters\n';
+                    debugInfo.textContent += 'First 100 characters: ' + text.substring(0, 100) + '...\n';
+                })
+                .catch(function(error) {
+                    debugInfo.textContent += 'Error: ' + error.message + '\n';
+                    debugInfo.textContent += 'This usually means the CSV file is not accessible via the web.\n';
                 });
         }<!DOCTYPE html>
 <html lang="en">
@@ -746,9 +835,11 @@
         <div class="upload-section" id="uploadSection" style="display: none;">
             <h3 style="color: #272727; margin-bottom: 15px;">Admin Panel</h3>
             <div id="loadDataPanel">
-                <h4 style="color: #272727;">📊 Load Data from CSV File</h4>
+                <h4 style="color: #272727;">📊 CSV File Debug Panel</h4>
                 <p style="margin-bottom: 15px; color: #272727;">CSV file status: <span id="csvStatus">Checking...</span></p>
-                <button id="loadDataBtn" style="padding: 10px 20px; border: 2px solid #272727; border-radius: 8px; background: #FFC956; color: #272727; font-weight: bold; cursor: pointer;">Load Latest Data</button>
+                <button id="loadDataBtn" style="padding: 10px 20px; border: 2px solid #272727; border-radius: 8px; background: #FFC956; color: #272727; font-weight: bold; cursor: pointer; margin-right: 10px;">Load Latest Data</button>
+                <button id="testCsvBtn" style="padding: 10px 20px; border: 2px solid #272727; border-radius: 8px; background: #FFF7EC; color: #272727; font-weight: bold; cursor: pointer;">Test CSV Access</button>
+                <div id="debugInfo" style="margin-top: 20px; padding: 15px; background: #FFF7EC; border: 1px solid #FFC956; border-radius: 8px; font-family: monospace; font-size: 0.9em; white-space: pre-wrap; display: none;"></div>
             </div>
             <button id="logoutBtn" style="margin-top: 15px; padding: 8px 16px; border: 2px solid #272727; border-radius: 8px; background: #272727; color: #EFEFEF; cursor: pointer;">Logout</button>
         </div>
@@ -908,7 +999,7 @@
         // DOM elements
         let loginScreen, mainDashboard, uploadSection, barberSelector, fileInput, uploadArea;
         let loginName, loginPassword, loginBtn, adminPassword, adminBtn, loginError, logoutBtn;
-        let leaderboardBtn, leaderboardModal, loadDataBtn;
+        let leaderboardBtn, leaderboardModal, loadDataBtn, testCsvBtn;
         
         // Initialize everything when page loads
         document.addEventListener('DOMContentLoaded', function() {
@@ -941,6 +1032,7 @@
             
             // Data loading
             loadDataBtn = document.getElementById('loadDataBtn');
+            testCsvBtn = document.getElementById('testCsvBtn');
         }
         
         function setupEventListeners() {
@@ -951,6 +1043,7 @@
             if (adminBtn) adminBtn.addEventListener('click', handleAdminLogin);
             if (logoutBtn) logoutBtn.addEventListener('click', handleLogout);
             if (loadDataBtn) loadDataBtn.addEventListener('click', loadCSVData);
+            if (testCsvBtn) testCsvBtn.addEventListener('click', testCsvAccess);
             
             // Try to load data automatically on page load
             loadCSVData();
