@@ -2,23 +2,28 @@
         }
         
         function loadCSVData() {
+            const csvStatus = document.getElementById('csvStatus');
+            if (csvStatus) csvStatus.textContent = 'Loading...';
+            
             // Try to load barber-data.csv from the repository
-            fetch('./barber-data.csv')
+            fetch('./barber-data.csv?t=' + new Date().getTime()) // Add timestamp to prevent caching
                 .then(function(response) {
                     if (!response.ok) {
-                        throw new Error('CSV file not found. Please upload barber-data.csv to your repository.');
+                        throw new Error('CSV file not found (Status: ' + response.status + ')');
                     }
                     return response.text();
                 })
                 .then(function(csvText) {
+                    if (csvStatus) csvStatus.textContent = 'Found CSV file, parsing data...';
                     parseCSV(csvText);
-                    console.log('Data loaded successfully');
+                    if (csvStatus) csvStatus.textContent = 'Data loaded successfully! (' + barberData.length + ' records)';
+                    console.log('Data loaded successfully:', barberData.length, 'records');
                 })
                 .catch(function(error) {
-                    console.log('Could not load CSV file:', error.message);
-                    // Don't show error to regular users, only in console
+                    console.error('CSV loading error:', error);
+                    if (csvStatus) csvStatus.textContent = 'Error: ' + error.message;
                     if (isAdmin) {
-                        alert('Could not load CSV file. Make sure barber-data.csv is uploaded to your repository.');
+                        alert('Could not load CSV file: ' + error.message);
                     }
                 });
         }<!DOCTYPE html>
@@ -718,9 +723,9 @@
                 </div>
                 
                 <div class="admin-panel" id="loadDataPanel">
-                    <h4>📊 Load Data from CSV File</h4>
-                    <p style="margin-bottom: 15px; color: #272727;">Make sure you've uploaded 'barber-data.csv' to your GitHub repository</p>
-                    <button id="loadDataBtn" class="login-btn">Load Latest Data</button>
+                    <h4>📊 CSV File Auto-Loading</h4>
+                    <p style="margin-bottom: 15px; color: #272727;">The system automatically loads from 'barber-data.csv'</p>
+                    <p style="margin-bottom: 15px; color: #272727; font-size: 0.9em;">To update data: Edit the barber-data.csv file in your GitHub repository</p>
                 </div>
             </div>
         </div>
@@ -738,13 +743,13 @@
             <p>Track your progress and tier advancement</p>
         </div>
         
-        <div class="upload-section" id="uploadSection">
-            <h3 style="color: #272727; margin-bottom: 15px;">Upload Monthly Data</h3>
-            <div class="upload-area" onclick="document.getElementById('csvFile').click()">
-                <div class="upload-text">📊 Click to upload CSV file or drag & drop</div>
-                <div class="upload-subtext">Expected format: Name, Month, Services, Products, Retention, Location, StartingTier, Password</div>
+        <div class="upload-section" id="uploadSection" style="display: none;">
+            <h3 style="color: #272727; margin-bottom: 15px;">Admin Panel</h3>
+            <div id="loadDataPanel">
+                <h4 style="color: #272727;">📊 Load Data from CSV File</h4>
+                <p style="margin-bottom: 15px; color: #272727;">CSV file status: <span id="csvStatus">Checking...</span></p>
+                <button id="loadDataBtn" style="padding: 10px 20px; border: 2px solid #272727; border-radius: 8px; background: #FFC956; color: #272727; font-weight: bold; cursor: pointer;">Load Latest Data</button>
             </div>
-            <input type="file" id="csvFile" accept=".csv" />
             <button id="logoutBtn" style="margin-top: 15px; padding: 8px 16px; border: 2px solid #272727; border-radius: 8px; background: #272727; color: #EFEFEF; cursor: pointer;">Logout</button>
         </div>
         
@@ -1149,19 +1154,34 @@
         }
         
         function parseCSV(csvText) {
+            console.log('Parsing CSV data...');
             const lines = csvText.trim().split('\n');
+            console.log('CSV lines:', lines.length);
+            
+            if (lines.length < 2) {
+                throw new Error('CSV must have at least a header row and one data row');
+            }
+            
             const headers = lines[0].split(',').map(function(h) {
-                return h.trim().toLowerCase();
+                return h.trim().toLowerCase().replace(/"/g, '');
             });
+            console.log('CSV headers:', headers);
             
             barberData = [];
             
             for (let i = 1; i < lines.length; i++) {
-                const values = lines[i].split(',');
-                const row = {};
+                const line = lines[i].trim();
+                if (!line) continue;
                 
+                const values = line.split(',').map(function(v) {
+                    return v.trim().replace(/"/g, '');
+                });
+                
+                if (values.length < headers.length) continue;
+                
+                const row = {};
                 headers.forEach(function(header, index) {
-                    row[header] = values[index] ? values[index].trim() : '';
+                    row[header] = values[index] || '';
                 });
                 
                 // Convert numeric values
@@ -1173,6 +1193,8 @@
                 
                 barberData.push(row);
             }
+            
+            console.log('Parsed barber data:', barberData);
             
             populateBarberDropdown();
             populateLoginDropdown();
