@@ -645,12 +645,12 @@
                 var startingTier = barberRows[0].startingtier || 1;
                 var currentTier = startingTier;
                 
-                // Count qualified months for tier advancement from recent 12 months
+                // Count qualified months for tier advancement
                 var tier2QualifiedMonths = 0;
                 var tier3QualifiedMonths = 0;
                 
-                for (var j = 0; j < recent12Months.length; j++) {
-                    var row = recent12Months[j];
+                for (var j = 0; j < barberRows.length; j++) {
+                    var row = barberRows[j];
                     if (row.services >= 200 && row.products >= 7 && row.retention >= 70) {
                         tier2QualifiedMonths++;
                     }
