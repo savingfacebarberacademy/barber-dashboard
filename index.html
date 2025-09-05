@@ -1,1703 +1,399 @@
-}
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Barber Dashboard</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            margin: 0; 
+            padding: 20px; 
+            background: linear-gradient(135deg, #272727 0%, #EFEFEF 100%);
+            min-height: 100vh;
         }
+        .container { 
+            max-width: 800px; 
+            margin: 0 auto; 
+            background: white; 
+            padding: 30px; 
+            border-radius: 10px; 
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+        .login-form { 
+            text-align: center; 
+            margin-bottom: 30px; 
+        }
+        .form-group { 
+            margin: 20px 0; 
+        }
+        label { 
+            display: block; 
+            margin-bottom: 5px; 
+            font-weight: bold; 
+        }
+        select, input, button { 
+            padding: 10px 15px; 
+            border: 2px solid #272727; 
+            border-radius: 5px; 
+            font-size: 16px;
+            width: 200px;
+        }
+        button { 
+            background: #FFC956; 
+            cursor: pointer; 
+            font-weight: bold;
+            width: auto;
+            padding: 10px 20px;
+        }
+        button:hover { 
+            background: #272727; 
+            color: white; 
+        }
+        button:disabled { 
+            background: #ccc; 
+            cursor: not-allowed; 
+        }
+        .error { 
+            color: red; 
+            margin: 10px 0; 
+        }
+        .status { 
+            margin: 20px 0; 
+            padding: 15px; 
+            background: #f0f0f0; 
+            border-radius: 5px; 
+        }
+        .dashboard { 
+            display: none; 
+        }
+        .metric { 
+            border: 2px solid #FFC956; 
+            padding: 20px; 
+            margin: 15px 0; 
+            border-radius: 8px; 
+        }
+        .metric h3 { 
+            margin: 0 0 10px 0; 
+            color: #272727; 
+        }
+        .metric-value { 
+            font-size: 2em; 
+            font-weight: bold; 
+            color: #272727; 
+        }
+        .admin-panel { 
+            background: #f9f9f9; 
+            padding: 20px; 
+            margin: 20px 0; 
+            border-radius: 8px; 
+            border: 2px solid #FFC956; 
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 style="text-align: center; color: #272727;">SAVING FACE Barber Dashboard</h1>
         
+        <!-- Login Section -->
+        <div id="loginSection" class="login-form">
+            <div class="status" id="loadStatus">Loading barber data...</div>
+            
+            <div class="form-group">
+                <label>Select Your Name:</label>
+                <select id="barberSelect">
+                    <option>Loading...</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label>Password:</label>
+                <input type="password" id="passwordInput" placeholder="Enter your password">
+            </div>
+            
+            <button id="loginBtn" disabled>Login</button>
+            
+            <div class="error" id="errorMsg" style="display: none;"></div>
+            
+            <!-- Admin Section -->
+            <div class="admin-panel">
+                <h3>Admin Access</h3>
+                <input type="password" id="adminPassword" placeholder="Admin password" style="margin-right: 10px;">
+                <button id="adminBtn">Admin Login</button>
+                <div id="adminPanel" style="display: none; margin-top: 20px;">
+                    <p>CSV Status: <span id="csvStatus">Unknown</span></p>
+                    <button id="testCsvBtn">Test CSV File</button>
+                    <button id="reloadBtn">Reload Data</button>
+                    <div id="debugInfo" style="margin-top: 10px; font-family: monospace; background: #eee; padding: 10px; border-radius: 5px; display: none;"></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Dashboard Section -->
+        <div id="dashboardSection" class="dashboard">
+            <div style="text-align: right; margin-bottom: 20px;">
+                <button id="logoutBtn">Logout</button>
+            </div>
+            
+            <h2 id="barberName">Barber Name</h2>
+            <p>Current Tier: <span id="currentTier">1</span> | Location: <span id="location">Unknown</span></p>
+            
+            <div class="metric">
+                <h3>Services Per Month</h3>
+                <div class="metric-value" id="servicesValue">0</div>
+                <p id="servicesTarget">Target for next tier</p>
+            </div>
+            
+            <div class="metric">
+                <h3>Products Sold Per Month</h3>
+                <div class="metric-value" id="productsValue">0</div>
+                <p id="productsTarget">Target for next tier</p>
+            </div>
+            
+            <div class="metric">
+                <h3>Client Retention</h3>
+                <div class="metric-value" id="retentionValue">0%</div>
+                <p id="retentionTarget">Target for next tier</p>
+            </div>
+            
+            <div class="metric">
+                <h3>Tier Progress</h3>
+                <p id="tierProgress">Progress toward next tier</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        var barberData = [];
+        var currentBarber = null;
+        var isAdmin = false;
+
+        // Load CSV data when page loads
+        loadCSVData();
+
         function loadCSVData() {
-            const csvStatus = document.getElementById('csvStatus');
-            if (csvStatus) csvStatus.textContent = 'Loading...';
+            document.getElementById('loadStatus').textContent = 'Loading CSV file...';
             
-            console.log('Attempting to load CSV file...');
-            
-            // Try to load barber-data.csv from the repository
-            fetch('./barber-data.csv?t=' + new Date().getTime()) // Add timestamp to prevent caching
+            fetch('./barber-data.csv?t=' + Date.now())
                 .then(function(response) {
-                    console.log('Fetch response status:', response.status);
-                    console.log('Fetch response headers:', response.headers);
-                    
-                    if (csvStatus) csvStatus.textContent = 'Received response (Status: ' + response.status + ')';
-                    
                     if (!response.ok) {
-                        throw new Error('CSV file not found (Status: ' + response.status + ')');
+                        throw new Error('HTTP ' + response.status);
                     }
                     return response.text();
                 })
                 .then(function(csvText) {
-                    console.log('CSV text received, length:', csvText.length);
-                    console.log('First 200 characters:', csvText.substring(0, 200));
-                    
-                    if (csvStatus) csvStatus.textContent = 'Found CSV file, parsing data...';
-                    
-                    if (!csvText || csvText.trim().length === 0) {
-                        throw new Error('CSV file is empty');
-                    }
-                    
+                    document.getElementById('loadStatus').textContent = 'Parsing data...';
                     parseCSV(csvText);
-                    
-                    if (csvStatus) csvStatus.textContent = 'Success! Loaded ' + barberData.length + ' records';
-                    console.log('Data loaded successfully:', barberData.length, 'records');
+                    document.getElementById('loadStatus').textContent = 'Data loaded successfully! (' + barberData.length + ' records)';
+                    populateBarberSelect();
                 })
                 .catch(function(error) {
-                    console.error('CSV loading error:', error);
-                    if (csvStatus) csvStatus.textContent = 'Error: ' + error.message;
-                    
-                    // Try alternative methods
-                    console.log('Trying alternative fetch method...');
-                    tryAlternativeFetch();
+                    document.getElementById('loadStatus').textContent = 'Error loading data: ' + error.message;
+                    console.error('Error:', error);
                 });
         }
-        
-        function tryAlternativeFetch() {
-            // Try fetching with different approaches
-            const alternatives = [
-                'barber-data.csv',
-                './barber-data.csv',
-                '/barber-dashboard/barber-data.csv'
-            ];
+
+        function parseCSV(csvText) {
+            var lines = csvText.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
+            var headers = lines[0].split(',').map(function(h) { return h.trim().toLowerCase(); });
             
-            function tryNext(index) {
-                if (index >= alternatives.length) {
-                    alert('Could not load CSV file. Please check:\n1. File is named exactly "barber-data.csv"\n2. File is in the root of your repository\n3. GitHub Pages is properly deployed');
-                    return;
+            barberData = [];
+            for (var i = 1; i < lines.length; i++) {
+                var line = lines[i].trim();
+                if (!line) continue;
+                
+                var values = line.split(',').map(function(v) { return v.trim(); });
+                if (values.length < headers.length) continue;
+                
+                var row = {};
+                for (var j = 0; j < headers.length; j++) {
+                    row[headers[j]] = values[j] || '';
                 }
                 
-                const url = alternatives[index];
-                console.log('Trying URL:', url);
+                row.services = parseInt(row.services) || 0;
+                row.products = parseInt(row.products) || 0;
+                row.retention = parseFloat(row.retention) || 0;
+                row.startingtier = parseInt(row.startingtier) || 1;
                 
-                fetch(url + '?t=' + new Date().getTime())
-                    .then(function(response) {
-                        if (response.ok) {
-                            return response.text();
-                        }
-                        throw new Error('Status: ' + response.status);
-                    })
-                    .then(function(csvText) {
-                        console.log('Success with URL:', url);
-                        parseCSV(csvText);
-                        const csvStatus = document.getElementById('csvStatus');
-                        if (csvStatus) csvStatus.textContent = 'Success! Loaded ' + barberData.length + ' records';
-                    })
-                    .catch(function(error) {
-                        console.log('Failed with URL:', url, error.message);
-                        tryNext(index + 1);
-                    });
+                barberData.push(row);
             }
-            
-            tryNext(0);
         }
-        
-        function testCsvAccess() {
-            const debugInfo = document.getElementById('debugInfo');
-            if (debugInfo) {
-                debugInfo.style.display = 'block';
-                debugInfo.textContent = 'Testing CSV file access...\n';
+
+        function populateBarberSelect() {
+            var select = document.getElementById('barberSelect');
+            var uniqueBarbers = [];
+            
+            for (var i = 0; i < barberData.length; i++) {
+                if (uniqueBarbers.indexOf(barberData[i].name) === -1) {
+                    uniqueBarbers.push(barberData[i].name);
+                }
             }
             
-            // Test direct access to the CSV
-            const testUrl = window.location.href.replace('/barber-dashboard/', '/barber-dashboard/barber-data.csv');
-            debugInfo.textContent += 'Current page URL: ' + window.location.href + '\n';
-            debugInfo.textContent += 'Trying CSV URL: ' + testUrl + '\n';
+            select.innerHTML = '<option value="">Select your name...</option>';
+            for (var i = 0; i < uniqueBarbers.length; i++) {
+                var option = document.createElement('option');
+                option.value = uniqueBarbers[i];
+                option.textContent = uniqueBarbers[i];
+                select.appendChild(option);
+            }
             
-            fetch(testUrl)
+            enableLoginForm();
+        }
+
+        function enableLoginForm() {
+            var select = document.getElementById('barberSelect');
+            var password = document.getElementById('passwordInput');
+            var loginBtn = document.getElementById('loginBtn');
+            
+            function checkForm() {
+                loginBtn.disabled = !(select.value && password.value.trim());
+            }
+            
+            select.addEventListener('change', checkForm);
+            password.addEventListener('input', checkForm);
+            loginBtn.addEventListener('click', handleLogin);
+            
+            // Admin functionality
+            document.getElementById('adminBtn').addEventListener('click', handleAdminLogin);
+            document.getElementById('testCsvBtn').addEventListener('click', testCSV);
+            document.getElementById('reloadBtn').addEventListener('click', loadCSVData);
+            document.getElementById('logoutBtn').addEventListener('click', logout);
+        }
+
+        function handleLogin() {
+            var selectedName = document.getElementById('barberSelect').value;
+            var enteredPassword = document.getElementById('passwordInput').value.trim();
+            var errorMsg = document.getElementById('errorMsg');
+            
+            var barberRows = barberData.filter(function(row) {
+                return row.name === selectedName;
+            });
+            
+            if (barberRows.length === 0) {
+                showError('No data found for this barber');
+                return;
+            }
+            
+            if (enteredPassword !== barberRows[0].password) {
+                showError('Incorrect password');
+                return;
+            }
+            
+            currentBarber = selectedName;
+            showDashboard();
+            displayBarberData(selectedName);
+            hideError();
+        }
+
+        function handleAdminLogin() {
+            var adminPassword = document.getElementById('adminPassword').value;
+            if (adminPassword === 'admin2024') {
+                isAdmin = true;
+                document.getElementById('adminPanel').style.display = 'block';
+                document.getElementById('csvStatus').textContent = 'Admin access granted';
+                hideError();
+            } else {
+                showError('Incorrect admin password');
+            }
+        }
+
+        function testCSV() {
+            var debugInfo = document.getElementById('debugInfo');
+            debugInfo.style.display = 'block';
+            debugInfo.textContent = 'Testing CSV access...\n';
+            
+            fetch('./barber-data.csv?test=' + Date.now())
                 .then(function(response) {
                     debugInfo.textContent += 'Response status: ' + response.status + '\n';
-                    debugInfo.textContent += 'Response headers: ' + JSON.stringify([...response.headers.entries()]) + '\n';
-                    
                     if (response.ok) {
                         return response.text();
                     }
                     throw new Error('HTTP ' + response.status);
                 })
                 .then(function(text) {
-                    debugInfo.textContent += 'CSV file loaded successfully!\n';
-                    debugInfo.textContent += 'File length: ' + text.length + ' characters\n';
-                    debugInfo.textContent += 'First 100 characters: ' + text.substring(0, 100) + '...\n';
+                    debugInfo.textContent += 'Success! File size: ' + text.length + ' characters\n';
+                    debugInfo.textContent += 'First 100 chars: ' + text.substring(0, 100) + '...\n';
                 })
                 .catch(function(error) {
                     debugInfo.textContent += 'Error: ' + error.message + '\n';
-                    debugInfo.textContent += 'This usually means the CSV file is not accessible via the web.\n';
                 });
-        }<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Barber Performance Dashboard</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
         }
-        
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #272727 0%, #EFEFEF 100%);
-            min-height: 100vh;
-            padding: 10px;
-            margin: 0;
-            position: relative;
-            overflow-x: auto;
-        }
-        
-        .login-screen {
-            display: block;
-            position: absolute;
-            z-index: 2000;
-            left: 0;
-            top: 0;
-            width: 100%;
-            min-height: 100vh;
-            background: linear-gradient(135deg, #272727 0%, #EFEFEF 100%);
-            padding: 20px;
-            box-sizing: border-box;
-        }
-        
-        .login-container {
-            background: #EFEFEF;
-            margin: 20px auto;
-            padding: 0;
-            border: 3px solid #FFF7EC;
-            border-radius: 15px;
-            width: 90%;
-            max-width: 500px;
-            box-shadow: 0 20px 60px rgba(39, 39, 39, 0.3);
-            overflow: hidden;
-        }
-        
-        .login-header {
-            background: #272727;
-            color: #EFEFEF;
-            padding: 30px;
-            text-align: center;
-        }
-        
-        .login-header h2 {
-            font-size: 2em;
-            margin-bottom: 10px;
-        }
-        
-        .login-form {
-            padding: 40px 30px;
-        }
-        
-        .form-group {
-            margin-bottom: 25px;
-        }
-        
-        .form-group label {
-            display: block;
-            margin-bottom: 8px;
-            font-weight: bold;
-            color: #272727;
-        }
-        
-        .form-group input, .form-group select {
-            width: 100%;
-            padding: 12px 15px;
-            border: 2px solid #272727;
-            border-radius: 8px;
-            background: #EFEFEF;
-            color: #272727;
-            font-size: 1em;
-            box-sizing: border-box;
-        }
-        
-        .form-group input:focus, .form-group select:focus {
-            outline: none;
-            border-color: #FFC956;
-        }
-        
-        .login-btn {
-            width: 100%;
-            padding: 15px;
-            background: #FFC956;
-            color: #272727;
-            border: 2px solid #272727;
-            border-radius: 8px;
-            font-size: 1.1em;
-            font-weight: bold;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-        
-        .login-btn:hover {
-            background: #272727;
-            color: #EFEFEF;
-        }
-        
-        .login-btn:disabled {
-            background: #ccc;
-            cursor: not-allowed;
-        }
-        
-        .error-message {
-            color: #272727;
-            background: #FFF7EC;
-            border: 2px solid #FFC956;
-            padding: 10px 15px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            text-align: center;
-        }
-        
-        .admin-panel {
-            background: #FFF7EC;
-            border: 2px solid #FFC956;
-            border-radius: 10px;
-            padding: 20px;
-            margin-top: 20px;
-        }
-        
-        .admin-panel h4 {
-            color: #272727;
-            margin-bottom: 15px;
-        }
-        
-        .data-paste-area {
-            width: 100%;
-            height: 200px;
-            padding: 15px;
-            border: 2px solid #272727;
-            border-radius: 8px;
-            background: #EFEFEF;
-            color: #272727;
-            font-family: monospace;
-            font-size: 0.9em;
-            resize: vertical;
-            box-sizing: border-box;
-        }
-        
-        .paste-instructions {
-            background: #FFF7EC;
-            border: 2px solid #FFC956;
-            border-radius: 8px;
-            padding: 15px;
-            margin-bottom: 20px;
-            color: #272727;
-            font-size: 0.9em;
-        }
-        
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            background: #EFEFEF;
-            border-radius: 15px;
-            box-shadow: 0 20px 60px rgba(39, 39, 39, 0.2);
-            overflow: hidden;
-            border: 3px solid #FFF7EC;
-        }
-        
-        .header {
-            background: #272727;
-            color: #EFEFEF;
-            padding: 30px;
-            text-align: center;
-            position: relative;
-        }
-        
-        .logo {
-            max-width: 200px;
-            height: auto;
-            margin-bottom: 15px;
-            filter: brightness(0) invert(1);
-        }
-        
-        .header h1 {
-            font-size: 2.5em;
-            margin-bottom: 10px;
-        }
-        
-        .header p {
-            opacity: 0.8;
-            font-size: 1.1em;
-        }
-        
-        .upload-section {
-            background: #FFF7EC;
-            padding: 20px 30px;
-            border-bottom: 2px solid #FFC956;
-            text-align: center;
-            display: none;
-        }
-        
-        .upload-area {
-            border: 3px dashed #272727;
-            border-radius: 10px;
-            padding: 30px;
-            margin: 20px 0;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-        
-        .upload-area:hover {
-            border-color: #FFC956;
-            background: rgba(255, 201, 86, 0.1);
-        }
-        
-        .upload-area.drag-over {
-            border-color: #FFC956;
-            background: rgba(255, 201, 86, 0.2);
-        }
-        
-        #csvFile {
-            display: none;
-        }
-        
-        .upload-text {
-            font-size: 1.1em;
-            color: #272727;
-            margin-bottom: 10px;
-        }
-        
-        .upload-subtext {
-            color: #272727;
-            opacity: 0.7;
-            font-size: 0.9em;
-        }
-        
-        .barber-selector {
-            background: #EFEFEF;
-            padding: 20px 30px;
-            border-bottom: 2px solid #FFF7EC;
-        }
-        
-        .barber-controls {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 15px;
-        }
-        
-        select {
-            padding: 10px 15px;
-            border: 2px solid #272727;
-            border-radius: 8px;
-            background: #EFEFEF;
-            color: #272727;
-            font-size: 1em;
-            min-width: 200px;
-        }
-        
-        .barber-info {
-            background: #EFEFEF;
-            padding: 20px 30px;
-            border-bottom: 2px solid #FFF7EC;
-        }
-        
-        .barber-name {
-            font-size: 1.5em;
-            font-weight: bold;
-            color: #272727;
-        }
-        
-        .current-rank {
-            display: inline-block;
-            background: #FFF7EC;
-            color: #272727;
-            padding: 5px 15px;
-            border-radius: 20px;
-            font-size: 0.9em;
-            margin-left: 15px;
-            font-weight: bold;
-        }
-        
-        .dashboard-content {
-            padding: 30px;
-        }
-        
-        .no-data-message {
-            text-align: center;
-            padding: 60px 20px;
-            color: #272727;
-            font-size: 1.2em;
-            opacity: 0.7;
-        }
-        
-        .metrics-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 25px;
-            margin-bottom: 40px;
-        }
-        
-        .metric-card {
-            background: #EFEFEF;
-            border: 2px solid #FFF7EC;
-            border-radius: 12px;
-            padding: 25px;
-            box-shadow: 0 4px 15px rgba(39, 39, 39, 0.1);
-            transition: transform 0.3s ease;
-        }
-        
-        .metric-card:hover {
-            transform: translateY(-5px);
-            border-color: #FFC956;
-        }
-        
-        .metric-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-        }
-        
-        .metric-title {
-            font-size: 1.1em;
-            color: #272727;
-            font-weight: 600;
-        }
-        
-        .metric-value {
-            font-size: 2em;
-            font-weight: bold;
-            color: #272727;
-        }
-        
-        .metric-target {
-            font-size: 0.9em;
-            color: #272727;
-            opacity: 0.7;
-        }
-        
-        .progress-bar {
-            width: 100%;
-            height: 10px;
-            background: rgba(39, 39, 39, 0.2);
-            border-radius: 5px;
-            overflow: hidden;
-            margin: 15px 0;
-        }
-        
-        .progress-fill {
-            height: 100%;
-            background: linear-gradient(90deg, #FFF7EC, #FFC956);
-            border-radius: 5px;
-            transition: width 0.8s ease;
-        }
-        
-        .progress-text {
-            font-size: 0.85em;
-            color: #272727;
-            opacity: 0.8;
-            text-align: center;
-            margin-top: 5px;
-        }
-        
-        .rank-progression {
-            background: #EFEFEF;
-            border: 2px solid #FFC956;
-            border-radius: 12px;
-            padding: 25px;
-            margin-bottom: 30px;
-        }
-        
-        .rank-progression h3 {
-            color: #272727;
-            margin-bottom: 20px;
-            font-size: 1.3em;
-        }
-        
-        .rank-ladder {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 15px;
-        }
-        
-        .rank-item {
-            text-align: center;
-            padding: 15px 20px;
-            border-radius: 8px;
-            min-width: 120px;
-            transition: all 0.3s ease;
-            border: 2px solid transparent;
-        }
-        
-        .rank-item.current {
-            background: #FFF7EC;
-            color: #272727;
-            transform: scale(1.1);
-            border-color: #FFC956;
-            font-weight: bold;
-        }
-        
-        .rank-item.achieved {
-            background: #FFC956;
-            color: #272727;
-            font-weight: bold;
-        }
-        
-        .rank-item.next {
-            background: #272727;
-            color: #EFEFEF;
-            border-color: #FFF7EC;
-        }
-        
-        .rank-item.future {
-            background: rgba(39, 39, 39, 0.1);
-            color: #272727;
-            opacity: 0.6;
-        }
-        
-        .rank-title {
-            font-weight: bold;
-            margin-bottom: 5px;
-        }
-        
-        .rank-requirements {
-            font-size: 0.8em;
-            opacity: 0.9;
-        }
-        
-        .monthly-breakdown {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 25px;
-        }
-        
-        .breakdown-card {
-            background: #EFEFEF;
-            border: 2px solid #FFC956;
-            border-radius: 12px;
-            padding: 20px;
-        }
-        
-        .breakdown-card h4 {
-            color: #272727;
-            margin-bottom: 15px;
-        }
-        
-        .breakdown-item {
-            display: flex;
-            justify-content: space-between;
-            padding: 8px 0;
-            border-bottom: 1px solid rgba(39, 39, 39, 0.2);
-        }
-        
-        .breakdown-item:last-child {
-            border-bottom: none;
-        }
-        
-        .status-indicator {
-            display: inline-block;
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            margin-right: 10px;
-        }
-        
-        .status-good { background: #FFC956; }
-        .status-warning { background: #FFF7EC; }
-        .status-danger { background: #272727; }
-        
-        .leaderboard-modal {
-            display: none;
-            position: fixed;
-            z-index: 1000;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(39, 39, 39, 0.8);
-            backdrop-filter: blur(5px);
-        }
-        
-        .leaderboard-content {
-            background: #EFEFEF;
-            margin: 5% auto;
-            padding: 0;
-            border: 3px solid #FFF7EC;
-            border-radius: 15px;
-            width: 90%;
-            max-width: 800px;
-            max-height: 80vh;
-            overflow-y: auto;
-            box-shadow: 0 20px 60px rgba(39, 39, 39, 0.3);
-        }
-        
-        .leaderboard-header {
-            background: #272727;
-            color: #EFEFEF;
-            padding: 25px 30px;
-            border-radius: 12px 12px 0 0;
-            position: sticky;
-            top: 0;
-            z-index: 10;
-        }
-        
-        .leaderboard-header h2 {
-            font-size: 1.8em;
-            margin-bottom: 10px;
-        }
-        
-        .leaderboard-subtitle {
-            opacity: 0.8;
-            font-size: 0.9em;
-        }
-        
-        .close {
-            color: #EFEFEF;
-            float: right;
-            font-size: 28px;
-            font-weight: bold;
-            cursor: pointer;
-            margin-top: -5px;
-        }
-        
-        .close:hover {
-            color: #FFC956;
-        }
-        
-        .leaderboard-tabs {
-            display: flex;
-            background: #FFF7EC;
-            border-bottom: 2px solid #FFC956;
-        }
-        
-        .leaderboard-tab {
-            flex: 1;
-            padding: 15px 20px;
-            text-align: center;
-            cursor: pointer;
-            background: transparent;
-            border: none;
-            color: #272727;
-            font-weight: bold;
-            transition: all 0.3s ease;
-        }
-        
-        .leaderboard-tab:hover {
-            background: rgba(255, 201, 86, 0.3);
-        }
-        
-        .leaderboard-tab.active {
-            background: #FFC956;
-            color: #272727;
-        }
-        
-        .leaderboard-list {
-            padding: 20px 30px;
-        }
-        
-        .leaderboard-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 15px 20px;
-            margin-bottom: 10px;
-            border-radius: 10px;
-            border: 2px solid transparent;
-            transition: all 0.3s ease;
-        }
-        
-        .leaderboard-item:hover {
-            border-color: #FFC956;
-            transform: translateX(5px);
-        }
-        
-        .leaderboard-item.you {
-            background: #FFF7EC;
-            border-color: #FFC956;
-            font-weight: bold;
-        }
-        
-        .leaderboard-item.top3 {
-            background: linear-gradient(45deg, #FFC956, #FFF7EC);
-            font-weight: bold;
-        }
-        
-        .rank-number {
-            font-size: 1.2em;
-            font-weight: bold;
-            color: #272727;
-            margin-right: 15px;
-            min-width: 30px;
-        }
-        
-        .barber-anonymous {
-            flex: 1;
-            color: #272727;
-        }
-        
-        .metric-score {
-            font-weight: bold;
-            color: #272727;
-        }
-        
-        .tier-badge {
-            background: #272727;
-            color: #EFEFEF;
-            padding: 4px 10px;
-            border-radius: 15px;
-            font-size: 0.8em;
-            margin-left: 10px;
-        }
-        
-        .your-position {
-            background: #FFC956;
-            color: #272727;
-            padding: 15px 20px;
-            border-radius: 10px;
-            margin: 20px 0;
-            text-align: center;
-            font-weight: bold;
-        }
-        
-        @media (max-width: 768px) {
-            .monthly-breakdown {
-                grid-template-columns: 1fr;
-            }
-            
-            .rank-ladder {
-                flex-direction: column;
-            }
-            
-            .metrics-grid {
-                grid-template-columns: 1fr;
-            }
-            
-            .leaderboard-content {
-                width: 95%;
-                margin: 2% auto;
-            }
-            
-            .leaderboard-tabs {
-                flex-direction: column;
-            }
-            
-            .admin-panel {
-                display: none;
-            }
-        }
-    </style>
-</head>
-<body>
-    <!-- Login Screen -->
-    <div id="loginScreen" class="login-screen">
-        <div class="login-container">
-            <div class="login-header">
-                <svg viewBox="0 0 400 200" xmlns="http://www.w3.org/2000/svg" style="max-width: 150px; height: auto; margin-bottom: 15px; filter: brightness(0) invert(1);">
-                    <text x="200" y="80" font-family="Arial Black, sans-serif" font-size="48" font-weight="900" text-anchor="middle" fill="#EFEFEF" stroke="#272727" stroke-width="2">SAVING</text>
-                    <text x="200" y="140" font-family="Arial Black, sans-serif" font-size="48" font-weight="900" text-anchor="middle" fill="#EFEFEF" stroke="#272727" stroke-width="2">FACE</text>
-                    <line x1="250" y1="120" x2="350" y2="160" stroke="#FFF7EC" stroke-width="8" stroke-linecap="round"/>
-                </svg>
-                <h2>Barber Login</h2>
-                <p style="opacity: 0.8;">Enter your credentials to view your dashboard</p>
-            </div>
-            
-            <div class="login-form">
-                <div id="loginError" class="error-message" style="display: none;"></div>
-                
-                <div class="form-group">
-                    <label for="loginName">Select Your Name:</label>
-                    <select id="loginName">
-                        <option value="">Upload data first...</option>
-                    </select>
-                </div>
-                
-                <div class="form-group">
-                    <label for="loginPassword">Password:</label>
-                    <input type="password" id="loginPassword" placeholder="Enter your password">
-                </div>
-                
-                <button id="loginBtn" class="login-btn" disabled>Login</button>
-                
-                <div class="admin-panel">
-                    <h4>👑 Admin Access</h4>
-                    <div class="form-group">
-                        <input type="password" id="adminPassword" placeholder="Admin password to upload data">
-                    </div>
-                    <button id="adminBtn" class="login-btn">Admin Login</button>
-                </div>
-                
-                <div class="admin-panel" id="loadDataPanel">
-                    <h4>📊 CSV File Auto-Loading</h4>
-                    <p style="margin-bottom: 15px; color: #272727;">The system automatically loads from 'barber-data.csv'</p>
-                    <p style="margin-bottom: 15px; color: #272727; font-size: 0.9em;">To update data: Edit the barber-data.csv file in your GitHub repository</p>
-                </div>
-            </div>
-        </div>
-    </div>
 
-    <!-- Main Dashboard -->
-    <div class="container" id="mainDashboard" style="display: none;">
-        <div class="header">
-            <svg class="logo" viewBox="0 0 400 200" xmlns="http://www.w3.org/2000/svg">
-                <text x="200" y="80" font-family="Arial Black, sans-serif" font-size="48" font-weight="900" text-anchor="middle" fill="#EFEFEF" stroke="#272727" stroke-width="2">SAVING</text>
-                <text x="200" y="140" font-family="Arial Black, sans-serif" font-size="48" font-weight="900" text-anchor="middle" fill="#EFEFEF" stroke="#272727" stroke-width="2">FACE</text>
-                <line x1="250" y1="120" x2="350" y2="160" stroke="#FFF7EC" stroke-width="8" stroke-linecap="round"/>
-            </svg>
-            <h1>Performance Dashboard</h1>
-            <p>Track your progress and tier advancement</p>
-        </div>
-        
-        <div class="upload-section" id="uploadSection" style="display: none;">
-            <h3 style="color: #272727; margin-bottom: 15px;">Admin Panel</h3>
-            <div id="loadDataPanel">
-                <h4 style="color: #272727;">📊 CSV File Debug Panel</h4>
-                <p style="margin-bottom: 15px; color: #272727;">CSV file status: <span id="csvStatus">Checking...</span></p>
-                <button id="loadDataBtn" style="padding: 10px 20px; border: 2px solid #272727; border-radius: 8px; background: #FFC956; color: #272727; font-weight: bold; cursor: pointer; margin-right: 10px;">Load Latest Data</button>
-                <button id="testCsvBtn" style="padding: 10px 20px; border: 2px solid #272727; border-radius: 8px; background: #FFF7EC; color: #272727; font-weight: bold; cursor: pointer;">Test CSV Access</button>
-                <div id="debugInfo" style="margin-top: 20px; padding: 15px; background: #FFF7EC; border: 1px solid #FFC956; border-radius: 8px; font-family: monospace; font-size: 0.9em; white-space: pre-wrap; display: none;"></div>
-            </div>
-            <button id="logoutBtn" style="margin-top: 15px; padding: 8px 16px; border: 2px solid #272727; border-radius: 8px; background: #272727; color: #EFEFEF; cursor: pointer;">Logout</button>
-        </div>
-        
-        <div class="barber-selector" style="display: none;" id="barberSelector">
-            <div class="barber-controls">
-                <div>
-                    <label for="barberSelect" style="color: #272727; font-weight: bold; margin-right: 10px;">Select Barber:</label>
-                    <select id="barberSelect">
-                        <option value="">Upload data to see barbers...</option>
-                    </select>
-                </div>
-                <div>
-                    <button id="leaderboardBtn" style="padding: 8px 16px; margin-right: 15px; border: 2px solid #272727; border-radius: 8px; background: #FFC956; color: #272727; font-weight: bold; cursor: pointer;">
-                        View Leaderboard
-                    </button>
-                </div>
-                <div style="color: #272727; opacity: 0.7;" id="lastUpdated">
-                    No data uploaded
-                </div>
-            </div>
-        </div>
-        
-        <div class="barber-info">
-            <span class="barber-name" id="currentBarberName">Select a barber</span>
-            <span class="current-rank" id="currentTier">No Tier</span>
-            <div style="float: right; color: #272727; opacity: 0.7;" id="barberLocation">
-                <span>Location: Not specified</span>
-            </div>
-            <div style="clear: both;"></div>
-        </div>
-        
-        <div class="dashboard-content">
-            <div class="no-data-message" id="noDataMessage">
-                Please upload a CSV file to view barber performance data
-            </div>
-            
-            <div id="dashboardData" style="display: none;">
-                <!-- Performance Metrics -->
-                <div class="metrics-grid">
-                    <div class="metric-card">
-                        <div class="metric-header">
-                            <span class="metric-title">Rolling 12-Month Average</span>
-                            <span class="status-indicator" id="servicesStatus"></span>
-                        </div>
-                        <div class="metric-value" id="servicesValue">0</div>
-                        <div class="metric-target" id="servicesTarget">Services per month</div>
-                        <div class="progress-bar">
-                            <div class="progress-fill" id="servicesProgress" style="width: 0%"></div>
-                        </div>
-                        <div class="progress-text" id="servicesText">0% of next tier requirement</div>
-                    </div>
-                    
-                    <div class="metric-card">
-                        <div class="metric-header">
-                            <span class="metric-title">Products Sold Monthly</span>
-                            <span class="status-indicator" id="productsStatus"></span>
-                        </div>
-                        <div class="metric-value" id="productsValue">0</div>
-                        <div class="metric-target" id="productsTarget">Average per month</div>
-                        <div class="progress-bar">
-                            <div class="progress-fill" id="productsProgress" style="width: 0%"></div>
-                        </div>
-                        <div class="progress-text" id="productsText">0% of next tier requirement</div>
-                    </div>
-                    
-                    <div class="metric-card">
-                        <div class="metric-header">
-                            <span class="metric-title">Client Retention</span>
-                            <span class="status-indicator" id="retentionStatus"></span>
-                        </div>
-                        <div class="metric-value" id="retentionValue">0%</div>
-                        <div class="metric-target" id="retentionTarget">Rolling average</div>
-                        <div class="progress-bar">
-                            <div class="progress-fill" id="retentionProgress" style="width: 0%"></div>
-                        </div>
-                        <div class="progress-text" id="retentionText">0% of next tier requirement</div>
-                    </div>
-                </div>
-                
-                <!-- Tier Progression -->
-                <div class="rank-progression">
-                    <h3>Tier Progression • Rolling 12-Month Requirements</h3>
-                    <div class="rank-ladder">
-                        <div class="rank-item achieved">
-                            <div class="rank-title">Tier 1</div>
-                            <div class="rank-requirements">Starting Level<br>Build your skills<br>& client base</div>
-                        </div>
-                        <div class="rank-item" id="tier2">
-                            <div class="rank-title">Tier 2</div>
-                            <div class="rank-requirements">200 services/month<br>7 products/month<br>70% retention<br><small>(7 of 12 months)</small></div>
-                        </div>
-                        <div class="rank-item" id="tier3">
-                            <div class="rank-title">Tier 3</div>
-                            <div class="rank-requirements">225 services/month<br>10 products/month<br>80% retention<br><small>(7 of 12 months)</small></div>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Monthly Breakdown -->
-                <div class="monthly-breakdown">
-                    <div class="breakdown-card">
-                        <h4 id="requirementsTitle">Next Tier Requirements Progress</h4>
-                        <div id="requirementsProgress">
-                            <!-- Will be populated by JavaScript -->
-                        </div>
-                    </div>
-                    
-                    <div class="breakdown-card">
-                        <h4>Recent Performance</h4>
-                        <div id="recentPerformance">
-                            <!-- Will be populated by JavaScript -->
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <!-- Leaderboard Modal -->
-    <div id="leaderboardModal" class="leaderboard-modal">
-        <div class="leaderboard-content">
-            <div class="leaderboard-header">
-                <span class="close">&times;</span>
-                <h2>🏆 Company Leaderboard</h2>
-                <p class="leaderboard-subtitle">Anonymous rankings • Your position is highlighted</p>
-            </div>
-            
-            <div class="leaderboard-tabs">
-                <button class="leaderboard-tab active" data-metric="services">Services</button>
-                <button class="leaderboard-tab" data-metric="products">Products</button>
-                <button class="leaderboard-tab" data-metric="retention">Retention</button>
-                <button class="leaderboard-tab" data-metric="overall">Overall</button>
-            </div>
-            
-            <div class="leaderboard-list" id="leaderboardList">
-                <!-- Populated by JavaScript -->
-            </div>
-        </div>
-    </div>
-    
-    <script>
-        // Global variables
-        let barberData = [];
-        let currentSelectedBarber = '';
-        let currentUser = null;
-        let isAdmin = false;
-        const ADMIN_PASSWORD = 'admin2024';
-        
-        // Tier requirements
-        const tierRequirements = {
-            1: { services: 0, products: 0, retention: 0 },
-            2: { services: 200, products: 7, retention: 70 },
-            3: { services: 225, products: 10, retention: 80 }
-        };
-        
-        // DOM elements
-        let loginScreen, mainDashboard, uploadSection, barberSelector, fileInput, uploadArea;
-        let loginName, loginPassword, loginBtn, adminPassword, adminBtn, loginError, logoutBtn;
-        let leaderboardBtn, leaderboardModal, loadDataBtn, testCsvBtn;
-        
-        // Initialize everything when page loads
-        document.addEventListener('DOMContentLoaded', function() {
-            initializeElements();
-            showLoginScreen();
-            setupEventListeners();
-        });
-        
-        function initializeElements() {
-            // Main elements
-            loginScreen = document.getElementById('loginScreen');
-            mainDashboard = document.getElementById('mainDashboard');
-            uploadSection = document.getElementById('uploadSection');
-            barberSelector = document.getElementById('barberSelector');
-            fileInput = document.getElementById('csvFile');
-            uploadArea = document.querySelector('.upload-area');
-            
-            // Login elements
-            loginName = document.getElementById('loginName');
-            loginPassword = document.getElementById('loginPassword');
-            loginBtn = document.getElementById('loginBtn');
-            adminPassword = document.getElementById('adminPassword');
-            adminBtn = document.getElementById('adminBtn');
-            loginError = document.getElementById('loginError');
-            logoutBtn = document.getElementById('logoutBtn');
-            
-            // Leaderboard elements
-            leaderboardBtn = document.getElementById('leaderboardBtn');
-            leaderboardModal = document.getElementById('leaderboardModal');
-            
-            // Data loading
-            loadDataBtn = document.getElementById('loadDataBtn');
-            testCsvBtn = document.getElementById('testCsvBtn');
-        }
-        
-        function setupEventListeners() {
-            // Login form
-            if (loginName) loginName.addEventListener('change', checkLoginForm);
-            if (loginPassword) loginPassword.addEventListener('input', checkLoginForm);
-            if (loginBtn) loginBtn.addEventListener('click', handleLogin);
-            if (adminBtn) adminBtn.addEventListener('click', handleAdminLogin);
-            if (logoutBtn) logoutBtn.addEventListener('click', handleLogout);
-            if (loadDataBtn) loadDataBtn.addEventListener('click', loadCSVData);
-            if (testCsvBtn) testCsvBtn.addEventListener('click', testCsvAccess);
-            
-            // Try to load data automatically on page load
-            loadCSVData();
-            
-            // Enter key support
-            if (loginPassword) {
-                loginPassword.addEventListener('keypress', function(e) {
-                    if (e.key === 'Enter' && loginBtn && !loginBtn.disabled) {
-                        handleLogin();
-                    }
-                });
-            }
-            
-            if (adminPassword) {
-                adminPassword.addEventListener('keypress', function(e) {
-                    if (e.key === 'Enter') {
-                        handleAdminLogin();
-                    }
-                });
-            }
-            
-            // File upload
-            setupFileUpload();
-            
-            // Leaderboard
-            setupLeaderboard();
-        }
-        
-        function setupFileUpload() {
-            if (uploadArea) {
-                uploadArea.addEventListener('dragover', function(e) {
-                    e.preventDefault();
-                    uploadArea.classList.add('drag-over');
-                });
-                
-                uploadArea.addEventListener('dragleave', function() {
-                    uploadArea.classList.remove('drag-over');
-                });
-                
-                uploadArea.addEventListener('drop', function(e) {
-                    e.preventDefault();
-                    uploadArea.classList.remove('drag-over');
-                    const files = e.dataTransfer.files;
-                    if (files.length > 0) {
-                        handleFile(files[0]);
-                    }
-                });
-            }
-            
-            if (fileInput) {
-                fileInput.addEventListener('change', function(e) {
-                    if (e.target.files.length > 0) {
-                        handleFile(e.target.files[0]);
-                    }
-                });
-            }
-        }
-        
-        function setupLeaderboard() {
-            if (leaderboardBtn) {
-                leaderboardBtn.addEventListener('click', showLeaderboard);
-            }
-            
-            const closeModal = document.querySelector('.close');
-            if (closeModal) {
-                closeModal.addEventListener('click', hideLeaderboard);
-            }
-            
-            window.addEventListener('click', function(e) {
-                if (e.target === leaderboardModal) {
-                    hideLeaderboard();
-                }
-            });
-            
-            // Tab switching
-            const tabs = document.querySelectorAll('.leaderboard-tab');
-            tabs.forEach(function(tab) {
-                tab.addEventListener('click', function() {
-                    tabs.forEach(function(t) {
-                        t.classList.remove('active');
-                    });
-                    tab.classList.add('active');
-                    updateLeaderboard(tab.dataset.metric);
-                });
-            });
-        }
-        
-        function showLoginScreen() {
-            if (loginScreen) loginScreen.style.display = 'block';
-            if (mainDashboard) mainDashboard.style.display = 'none';
-        }
-        
-        function showDashboard() {
-            if (loginScreen) loginScreen.style.display = 'none';
-            if (mainDashboard) mainDashboard.style.display = 'block';
-            
-            // Show/hide sections based on user type
-            if (isAdmin) {
-                if (uploadSection) uploadSection.style.display = 'block';
-                if (barberSelector) barberSelector.style.display = 'block';
-            } else {
-                if (uploadSection) uploadSection.style.display = 'none';
-                if (barberSelector) barberSelector.style.display = 'none';
-                // Auto-load the logged-in barber's data
-                if (currentUser && barberData.length > 0) {
-                    displayBarberData(currentUser);
-                }
-            }
-        }
-        
-        function checkLoginForm() {
-            const nameSelected = loginName.value !== '';
-            const passwordEntered = loginPassword.value.trim() !== '';
-            loginBtn.disabled = !(nameSelected && passwordEntered);
-        }
-        
-        function handleLogin() {
-            const selectedName = loginName.value;
-            const enteredPassword = loginPassword.value.trim();
-            
-            // Find barber data to check password
-            const barberRows = barberData.filter(function(row) {
-                return row.name === selectedName;
-            });
-            
-            if (barberRows.length === 0) {
-                showLoginError('No data found for this barber. Please contact your manager.');
-                return;
-            }
-            
-            const correctPassword = barberRows[0].password;
-            if (enteredPassword !== correctPassword) {
-                showLoginError('Incorrect password. Please try again.');
-                return;
-            }
-            
-            // Successful login
-            currentUser = selectedName;
-            isAdmin = false;
-            hideLoginError();
-            showDashboard();
-        }
-        
-        function handleAdminLogin() {
-            const enteredPassword = adminPassword.value.trim();
-            
-            if (enteredPassword !== ADMIN_PASSWORD) {
-                showLoginError('Incorrect admin password.');
-                return;
-            }
-            
-            // Successful admin login
-            currentUser = null;
-            isAdmin = true;
-            hideLoginError();
-            showDashboard();
-        }
-        
-        function handleLogout() {
-            currentUser = null;
-            isAdmin = false;
-            currentSelectedBarber = '';
-            if (loginName) loginName.value = '';
-            if (loginPassword) loginPassword.value = '';
-            if (adminPassword) adminPassword.value = '';
-            checkLoginForm();
-            checkLoginForm();
-            
-            const noDataMsg = document.getElementById('noDataMessage');
-            const dashboardData = document.getElementById('dashboardData');
-            if (noDataMsg) noDataMsg.style.display = 'block';
-            if (dashboardData) dashboardData.style.display = 'none';
-            
-            showLoginScreen();
-        }
-        
-        function showLoginError(message) {
-            if (loginError) {
-                loginError.textContent = message;
-                loginError.style.display = 'block';
-            }
-        }
-        
-        function hideLoginError() {
-            if (loginError) {
-                loginError.style.display = 'none';
-            }
-        }
-        
-        function handleFile(file) {
-            if (file.type !== 'text/csv' && !file.name.endsWith('.csv')) {
-                alert('Please upload a CSV file');
-                return;
-            }
-            
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                parseCSV(e.target.result);
-            };
-            reader.readAsText(file);
-        }
-        
-        function parseCSV(csvText) {
-            console.log('Parsing CSV data...');
-            // Handle different line endings (Windows \r\n, Mac \r, Unix \n)
-            const lines = csvText.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
-            console.log('CSV lines:', lines.length);
-            
-            if (lines.length < 2) {
-                throw new Error('CSV must have at least a header row and one data row');
-            }
-            
-            const headers = lines[0].split(',').map(function(h) {
-                return h.trim().toLowerCase().replace(/"/g, '');
-            });
-            console.log('CSV headers:', headers);
-            
-            barberData = [];
-            
-            for (let i = 1; i < lines.length; i++) {
-                const line = lines[i].trim();
-                if (!line) continue; // Skip empty lines
-                
-                const values = line.split(',').map(function(v) {
-                    return v.trim().replace(/"/g, '');
-                });
-                
-                if (values.length < headers.length) continue;
-                
-                const row = {};
-                headers.forEach(function(header, index) {
-                    row[header] = values[index] || '';
-                });
-                
-                // Convert numeric values
-                row.services = parseInt(row.services) || 0;
-                row.products = parseInt(row.products) || 0;
-                row.retention = parseFloat(row.retention) || 0;
-                row.startingtier = parseInt(row.startingtier) || 1;
-                row.password = row.password ? row.password.trim() : '';
-                
-                barberData.push(row);
-            }
-            
-            console.log('Parsed barber data:', barberData);
-            
-            populateBarberDropdown();
-            populateLoginDropdown();
-            
-            const lastUpdated = document.getElementById('lastUpdated');
-            if (lastUpdated) {
-                lastUpdated.textContent = 'Last Updated: ' + new Date().toLocaleDateString();
-            }
-        }
-        
-        function populateLoginDropdown() {
-            const uniqueBarbers = [];
-            barberData.forEach(function(row) {
-                if (uniqueBarbers.indexOf(row.name) === -1) {
-                    uniqueBarbers.push(row.name);
-                }
-            });
-            
-            if (loginName) {
-                loginName.innerHTML = '<option value="">Select your name...</option>';
-                
-                uniqueBarbers.forEach(function(barber) {
-                    const option = document.createElement('option');
-                    option.value = barber;
-                    option.textContent = barber;
-                    loginName.appendChild(option);
-                });
-            }
-        }
-        
-        function populateBarberDropdown() {
-            const select = document.getElementById('barberSelect');
-            if (!select) return;
-            
-            const uniqueBarbers = [];
-            barberData.forEach(function(row) {
-                if (uniqueBarbers.indexOf(row.name) === -1) {
-                    uniqueBarbers.push(row.name);
-                }
-            });
-            
-            select.innerHTML = '<option value="">Select a barber...</option>';
-            
-            uniqueBarbers.forEach(function(barber) {
-                const option = document.createElement('option');
-                option.value = barber;
-                option.textContent = barber;
-                select.appendChild(option);
-            });
-            
-            select.addEventListener('change', function() {
-                if (this.value) {
-                    displayBarberData(this.value);
-                }
-            });
-        }
-        
         function displayBarberData(barberName) {
-            currentSelectedBarber = barberName;
-            const barberRows = barberData.filter(function(row) {
+            var barberRows = barberData.filter(function(row) {
                 return row.name === barberName;
             });
             
             if (barberRows.length === 0) return;
             
-            // Calculate 12-month averages
-            const totalServices = barberRows.reduce(function(sum, row) {
-                return sum + row.services;
-            }, 0);
-            const totalProducts = barberRows.reduce(function(sum, row) {
-                return sum + row.products;
-            }, 0);
-            const totalRetention = barberRows.reduce(function(sum, row) {
-                return sum + row.retention;
-            }, 0);
-            
-            const avgServices = totalServices / barberRows.length;
-            const avgProducts = totalProducts / barberRows.length;
-            const avgRetention = totalRetention / barberRows.length;
-            
-            // Get starting tier and calculate qualified months
-            const startingTier = barberRows[0].startingtier || 1;
-            
-            // Count months that meet tier requirements
-            const tier2QualifiedMonths = barberRows.filter(function(row) {
-                return row.services >= tierRequirements[2].services && 
-                       row.products >= tierRequirements[2].products && 
-                       row.retention >= tierRequirements[2].retention;
-            }).length;
-            
-            const tier3QualifiedMonths = barberRows.filter(function(row) {
-                return row.services >= tierRequirements[3].services && 
-                       row.products >= tierRequirements[3].products && 
-                       row.retention >= tierRequirements[3].retention;
-            }).length;
-            
-            // Determine current tier based on starting tier and qualified months
-            let currentTier = startingTier;
-            if (startingTier < 3 && tier3QualifiedMonths >= 7) {
-                currentTier = 3;
-            } else if (startingTier < 2 && tier2QualifiedMonths >= 7) {
-                currentTier = 2;
+            // Calculate averages
+            var totalServices = 0, totalProducts = 0, totalRetention = 0;
+            for (var i = 0; i < barberRows.length; i++) {
+                totalServices += barberRows[i].services;
+                totalProducts += barberRows[i].products;
+                totalRetention += barberRows[i].retention;
             }
             
-            const nextTier = Math.min(currentTier + 1, 3);
-            const location = barberRows[0].location || 'Not specified';
+            var avgServices = totalServices / barberRows.length;
+            var avgProducts = totalProducts / barberRows.length;
+            var avgRetention = totalRetention / barberRows.length;
             
-            // Update barber info
-            const currentBarberName = document.getElementById('currentBarberName');
-            const currentTierElement = document.getElementById('currentTier');
-            const barberLocation = document.getElementById('barberLocation');
+            // Determine current tier
+            var startingTier = barberRows[0].startingtier || 1;
+            var currentTier = startingTier;
             
-            if (currentBarberName) currentBarberName.textContent = barberName;
-            if (currentTierElement) currentTierElement.textContent = 'Tier ' + currentTier;
-            if (barberLocation) barberLocation.innerHTML = '<span>Location: ' + location + '</span>';
+            // Update display
+            document.getElementById('barberName').textContent = barberName;
+            document.getElementById('currentTier').textContent = currentTier;
+            document.getElementById('location').textContent = barberRows[0].location || 'Unknown';
             
-            // Update metrics
-            updateMetrics(avgServices, avgProducts, avgRetention, currentTier, nextTier, tier2QualifiedMonths, tier3QualifiedMonths);
+            document.getElementById('servicesValue').textContent = Math.round(avgServices);
+            document.getElementById('productsValue').textContent = avgProducts.toFixed(1);
+            document.getElementById('retentionValue').textContent = Math.round(avgRetention) + '%';
             
-            // Update tier progression
-            updateTierProgression(currentTier);
-            
-            // Update requirements and recent performance
-            updateRequirementsProgress(avgServices, avgProducts, avgRetention, nextTier, currentTier === 2 ? tier3QualifiedMonths : tier2QualifiedMonths);
-            updateRecentPerformance(barberRows);
-            
-            // Show dashboard data
-            const noDataMessage = document.getElementById('noDataMessage');
-            const dashboardData = document.getElementById('dashboardData');
-            if (noDataMessage) noDataMessage.style.display = 'none';
-            if (dashboardData) dashboardData.style.display = 'block';
-            
-            // Animate progress bars
-            setTimeout(animateProgressBars, 100);
-        }
-        
-        function updateMetrics(services, products, retention, currentTier, nextTier, tier2Months, tier3Months) {
-            const servicesValue = document.getElementById('servicesValue');
-            const servicesTarget = document.getElementById('servicesTarget');
-            const servicesProgress = document.getElementById('servicesProgress');
-            const servicesText = document.getElementById('servicesText');
-            const servicesStatus = document.getElementById('servicesStatus');
-            
-            const productsValue = document.getElementById('productsValue');
-            const productsTarget = document.getElementById('productsTarget');
-            const productsProgress = document.getElementById('productsProgress');
-            const productsText = document.getElementById('productsText');
-            const productsStatus = document.getElementById('productsStatus');
-            
-            const retentionValue = document.getElementById('retentionValue');
-            const retentionTarget = document.getElementById('retentionTarget');
-            const retentionProgressEl = document.getElementById('retentionProgress');
-            const retentionText = document.getElementById('retentionText');
-            const retentionStatus = document.getElementById('retentionStatus');
-            
-            if (currentTier === 3) {
-                // Already at max tier
-                if (servicesValue) servicesValue.textContent = Math.round(services);
-                if (servicesTarget) servicesTarget.textContent = 'Services per month (Max Tier Achieved!)';
-                if (servicesProgress) servicesProgress.style.width = '100%';
-                if (servicesText) servicesText.textContent = 'Maximum tier achieved! 🎉';
-                if (servicesStatus) servicesStatus.className = 'status-indicator status-good';
-                
-                if (productsValue) productsValue.textContent = products.toFixed(1);
-                if (productsTarget) productsTarget.textContent = 'Average per month (Max Tier Achieved!)';
-                if (productsProgress) productsProgress.style.width = '100%';
-                if (productsText) productsText.textContent = 'Maximum tier achieved! 🎉';
-                if (productsStatus) productsStatus.className = 'status-indicator status-good';
-                
-                if (retentionValue) retentionValue.textContent = Math.round(retention) + '%';
-                if (retentionTarget) retentionTarget.textContent = 'Rolling average (Max Tier Achieved!)';
-                if (retentionProgressEl) retentionProgressEl.style.width = '100%';
-                if (retentionText) retentionText.textContent = 'Maximum tier achieved! 🎉';
-                if (retentionStatus) retentionStatus.className = 'status-indicator status-good';
-                return;
-            }
-            
-            const nextReqs = tierRequirements[nextTier];
-            
-            // Services
-            if (servicesValue) servicesValue.textContent = Math.round(services);
-            if (servicesTarget) servicesTarget.textContent = 'Services per month (need ' + nextReqs.services + ' for Tier ' + nextTier + ')';
-            const servicesProgressValue = Math.min((services / nextReqs.services) * 100, 100);
-            if (servicesProgress) servicesProgress.style.width = servicesProgressValue + '%';
-            if (servicesText) servicesText.textContent = Math.round(servicesProgressValue) + '% of Tier ' + nextTier + ' requirement • Need ' + Math.max(0, nextReqs.services - Math.round(services)) + ' more';
-            if (servicesStatus) servicesStatus.className = 'status-indicator ' + (servicesProgressValue >= 100 ? 'status-good' : servicesProgressValue >= 80 ? 'status-warning' : 'status-danger');
-            
-            // Products
-            if (productsValue) productsValue.textContent = products.toFixed(1);
-            if (productsTarget) productsTarget.textContent = 'Average per month (need ' + nextReqs.products + ' for Tier ' + nextTier + ')';
-            const productsProgressValue = Math.min((products / nextReqs.products) * 100, 100);
-            if (productsProgress) productsProgress.style.width = productsProgressValue + '%';
-            if (productsText) productsText.textContent = Math.round(productsProgressValue) + '% of Tier ' + nextTier + ' requirement • Need ' + Math.max(0, (nextReqs.products - products).toFixed(1)) + ' more';
-            if (productsStatus) productsStatus.className = 'status-indicator ' + (productsProgressValue >= 100 ? 'status-good' : productsProgressValue >= 80 ? 'status-warning' : 'status-danger');
-            
-            // Retention
-            if (retentionValue) retentionValue.textContent = Math.round(retention) + '%';
-            if (retentionTarget) retentionTarget.textContent = 'Rolling average (need ' + nextReqs.retention + '% for Tier ' + nextTier + ')';
-            const retentionProgressValue = Math.min((retention / nextReqs.retention) * 100, 100);
-            if (retentionProgressEl) retentionProgressEl.style.width = retentionProgressValue + '%';
-            if (retentionText) retentionText.textContent = Math.round(retentionProgressValue) + '% of Tier ' + nextTier + ' requirement • Need ' + Math.max(0, nextReqs.retention - Math.round(retention)) + '% improvement';
-            if (retentionStatus) retentionStatus.className = 'status-indicator ' + (retentionProgressValue >= 100 ? 'status-good' : retentionProgressValue >= 90 ? 'status-warning' : 'status-danger');
-        }
-        
-        function updateTierProgression(currentTier) {
-            const tier2 = document.getElementById('tier2');
-            const tier3 = document.getElementById('tier3');
-            
-            // Reset all tiers
-            if (tier2) tier2.className = 'rank-item future';
-            if (tier3) tier3.className = 'rank-item future';
-            
-            // Set achieved tiers
-            for (let i = 2; i <= currentTier; i++) {
-                const tierElement = document.getElementById('tier' + i);
-                if (tierElement) tierElement.className = 'rank-item achieved';
-            }
-            
-            // Set current tier
-            if (currentTier < 3) {
-                const currentTierElement = document.getElementById('tier' + currentTier);
-                if (currentTierElement) currentTierElement.className = 'rank-item current';
-                
-                if (currentTier + 1 <= 3) {
-                    const nextTierElement = document.getElementById('tier' + (currentTier + 1));
-                    if (nextTierElement) nextTierElement.className = 'rank-item next';
-                }
+            // Set targets based on current tier
+            if (currentTier === 1) {
+                document.getElementById('servicesTarget').textContent = 'Need 200 for Tier 2';
+                document.getElementById('productsTarget').textContent = 'Need 7 for Tier 2';
+                document.getElementById('retentionTarget').textContent = 'Need 70% for Tier 2';
+            } else if (currentTier === 2) {
+                document.getElementById('servicesTarget').textContent = 'Need 225 for Tier 3';
+                document.getElementById('productsTarget').textContent = 'Need 10 for Tier 3';
+                document.getElementById('retentionTarget').textContent = 'Need 80% for Tier 3';
             } else {
-                if (tier3) tier3.className = 'rank-item current';
-            }
-        }
-        
-        function updateRequirementsProgress(services, products, retention, nextTier, qualifiedMonths) {
-            const container = document.getElementById('requirementsProgress');
-            const title = document.getElementById('requirementsTitle');
-            
-            if (!container || !title) return;
-            
-            if (nextTier > 3) {
-                title.textContent = 'Maximum Tier Achieved! 🏆';
-                container.innerHTML = '<div class="breakdown-item"><span>Congratulations!</span><span style="color: #FFC956;">✓ Tier 3 Achieved</span></div><div class="breakdown-item"><span>Keep up the excellent work!</span><span style="color: #FFC956;">✓ Top Performer</span></div>';
-                return;
+                document.getElementById('servicesTarget').textContent = 'Maximum tier achieved!';
+                document.getElementById('productsTarget').textContent = 'Maximum tier achieved!';
+                document.getElementById('retentionTarget').textContent = 'Maximum tier achieved!';
             }
             
-            const nextReqs = tierRequirements[nextTier];
-            title.textContent = 'Tier ' + nextTier + ' Requirements Progress';
-            
-            container.innerHTML = 
-                '<div class="breakdown-item"><span>Services (' + nextReqs.services + '/month avg)</span><span style="color: ' + (services >= nextReqs.services ? '#FFC956' : '#272727') + ';">' + (services >= nextReqs.services ? '✓' : '✗') + ' ' + Math.round(services) + '/' + nextReqs.services + '</span></div>' +
-                '<div class="breakdown-item"><span>Products (' + nextReqs.products + '/month avg)</span><span style="color: ' + (products >= nextReqs.products ? '#FFC956' : '#272727') + ';">' + (products >= nextReqs.products ? '✓' : '✗') + ' ' + products.toFixed(1) + '/' + nextReqs.products + '</span></div>' +
-                '<div class="breakdown-item"><span>Retention (' + nextReqs.retention + '% avg)</span><span style="color: ' + (retention >= nextReqs.retention ? '#FFC956' : '#272727') + ';">' + (retention >= nextReqs.retention ? '✓' : '✗') + ' ' + Math.round(retention) + '%/' + nextReqs.retention + '%</span></div>' +
-                '<div class="breakdown-item"><span><strong>Qualified Months (need 7/12)</strong></span><span><strong style="color: ' + (qualifiedMonths >= 7 ? '#FFC956' : '#272727') + ';">' + (qualifiedMonths >= 7 ? '✓' : '✗') + ' ' + qualifiedMonths + '/12 Months</strong></span></div>';
+            document.getElementById('tierProgress').textContent = 'Currently Tier ' + currentTier + ' - Keep up the great work!';
         }
-        
-        function updateRecentPerformance(barberRows) {
-            const container = document.getElementById('recentPerformance');
-            if (!container) return;
-            
-            const recent = barberRows.slice(-4).reverse(); // Last 4 months, most recent first
-            
-            let html = '';
-            recent.forEach(function(row) {
-                html += '<div class="breakdown-item"><span>' + row.month + '</span><span>' + row.services + ' services, ' + row.products + ' products, ' + row.retention + '% retention</span></div>';
-            });
-            
-            container.innerHTML = html;
+
+        function showDashboard() {
+            document.getElementById('loginSection').style.display = 'none';
+            document.getElementById('dashboardSection').style.display = 'block';
         }
-        
-        function animateProgressBars() {
-            const progressBars = document.querySelectorAll('.progress-fill');
-            progressBars.forEach(function(bar) {
-                const width = bar.style.width;
-                bar.style.width = '0%';
-                setTimeout(function() {
-                    bar.style.width = width;
-                }, 500);
-            });
+
+        function logout() {
+            document.getElementById('loginSection').style.display = 'block';
+            document.getElementById('dashboardSection').style.display = 'none';
+            document.getElementById('barberSelect').value = '';
+            document.getElementById('passwordInput').value = '';
+            document.getElementById('adminPassword').value = '';
+            document.getElementById('adminPanel').style.display = 'none';
+            document.getElementById('loginBtn').disabled = true;
+            currentBarber = null;
+            isAdmin = false;
+            hideError();
         }
-        
-        // Leaderboard functions
-        function showLeaderboard() {
-            if (barberData.length === 0) {
-                alert('Please upload data first');
-                return;
-            }
-            if (leaderboardModal) leaderboardModal.style.display = 'block';
-            updateLeaderboard('overall');
+
+        function showError(message) {
+            var errorMsg = document.getElementById('errorMsg');
+            errorMsg.textContent = message;
+            errorMsg.style.display = 'block';
         }
-        
-        function hideLeaderboard() {
-            if (leaderboardModal) leaderboardModal.style.display = 'none';
-        }
-        
-        function calculateBarberStats() {
-            const barberStats = {};
-            const uniqueBarbers = [];
-            
-            barberData.forEach(function(row) {
-                if (uniqueBarbers.indexOf(row.name) === -1) {
-                    uniqueBarbers.push(row.name);
-                }
-            });
-            
-            uniqueBarbers.forEach(function(barber) {
-                const barberRows = barberData.filter(function(row) {
-                    return row.name === barber;
-                });
-                
-                const totalServices = barberRows.reduce(function(sum, row) {
-                    return sum + row.services;
-                }, 0);
-                const totalProducts = barberRows.reduce(function(sum, row) {
-                    return sum + row.products;
-                }, 0);
-                const totalRetention = barberRows.reduce(function(sum, row) {
-                    return sum + row.retention;
-                }, 0);
-                
-                const avgServices = totalServices / barberRows.length;
-                const avgProducts = totalProducts / barberRows.length;
-                const avgRetention = totalRetention / barberRows.length;
-                
-                const startingTier = barberRows[0].startingtier || 1;
-                const tier2QualifiedMonths = barberRows.filter(function(row) {
-                    return row.services >= tierRequirements[2].services && 
-                           row.products >= tierRequirements[2].products && 
-                           row.retention >= tierRequirements[2].retention;
-                }).length;
-                
-                const tier3QualifiedMonths = barberRows.filter(function(row) {
-                    return row.services >= tierRequirements[3].services && 
-                           row.products >= tierRequirements[3].products && 
-                           row.retention >= tierRequirements[3].retention;
-                }).length;
-                
-                let currentTier = startingTier;
-                if (startingTier < 3 && tier3QualifiedMonths >= 7) {
-                    currentTier = 3;
-                } else if (startingTier < 2 && tier2QualifiedMonths >= 7) {
-                    currentTier = 2;
-                }
-                
-                // Overall score calculation (weighted average)
-                const overallScore = (avgServices * 0.4) + (avgProducts * 8) + (avgRetention * 0.6) + (currentTier * 50);
-                
-                barberStats[barber] = {
-                    services: avgServices,
-                    products: avgProducts,
-                    retention: avgRetention,
-                    tier: currentTier,
-                    overall: overallScore
-                };
-            });
-            
-            return barberStats;
-        }
-        
-        function updateLeaderboard(metric) {
-            const stats = calculateBarberStats();
-            const barberNames = Object.keys(stats);
-            
-            barberNames.sort(function(a, b) {
-                return stats[b][metric] - stats[a][metric];
-            });
-            
-            const container = document.getElementById('leaderboardList');
-            if (!container) return;
-            
-            let html = '';
-            
-            // Add your position summary
-            if (currentSelectedBarber) {
-                const yourRank = barberNames.indexOf(currentSelectedBarber) + 1;
-                html += '<div class="your-position">🎯 Your Position: #' + yourRank + ' of ' + barberNames.length + ' barbers</div>';
-            }
-            
-            barberNames.forEach(function(barber, index) {
-                const isYou = barber === currentSelectedBarber;
-                const isTop3 = index < 3;
-                const stat = stats[barber];
-                
-                let displayValue;
-                switch(metric) {
-                    case 'services':
-                        displayValue = Math.round(stat.services) + ' services';
-                        break;
-                    case 'products':
-                        displayValue = stat.products.toFixed(1) + ' products';
-                        break;
-                    case 'retention':
-                        displayValue = Math.round(stat.retention) + '%';
-                        break;
-                    case 'overall':
-                        displayValue = 'Score: ' + Math.round(stat.overall);
-                        break;
-                }
-                
-                const anonymousName = isYou ? 'You' : 'Barber ' + (index + 1);
-                const rankEmoji = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : '';
-                
-                html += '<div class="leaderboard-item ' + (isYou ? 'you' : '') + ' ' + (isTop3 && !isYou ? 'top3' : '') + '">' +
-                        '<div class="rank-number">' + rankEmoji + ' #' + (index + 1) + '</div>' +
-                        '<div class="barber-anonymous">' + anonymousName + '</div>' +
-                        '<div class="metric-score">' + displayValue + '</div>' +
-                        '<div class="tier-badge">Tier ' + stat.tier + '</div>' +
-                        '</div>';
-            });
-            
-            container.innerHTML = html;
+
+        function hideError() {
+            document.getElementById('errorMsg').style.display = 'none';
         }
     </script>
 </body>
