@@ -376,6 +376,7 @@
         function logout() {
             document.getElementById('loginSection').style.display = 'block';
             document.getElementById('dashboardSection').style.display = 'none';
+            document.getElementById('leaderboardSection').style.display = 'none';
             document.getElementById('barberSelect').value = '';
             document.getElementById('passwordInput').value = '';
             document.getElementById('adminPassword').value = '';
@@ -394,6 +395,135 @@
 
         function hideError() {
             document.getElementById('errorMsg').style.display = 'none';
+        }
+        
+        // Leaderboard functions
+        function updateLeaderboard(metric) {
+            var stats = calculateBarberStats();
+            var barberNames = Object.keys(stats);
+            
+            // Sort by metric
+            barberNames.sort(function(a, b) {
+                return stats[b][metric] - stats[a][metric];
+            });
+            
+            // Show your position
+            var yourPosition = document.getElementById('yourPosition');
+            if (currentBarber) {
+                var yourRank = barberNames.indexOf(currentBarber) + 1;
+                yourPosition.textContent = '🎯 Your Position: #' + yourRank + ' of ' + barberNames.length + ' barbers';
+                yourPosition.style.display = 'block';
+            } else {
+                yourPosition.style.display = 'none';
+            }
+            
+            // Create leaderboard list
+            var listContainer = document.getElementById('leaderboardList');
+            listContainer.innerHTML = '';
+            
+            for (var i = 0; i < barberNames.length; i++) {
+                var barber = barberNames[i];
+                var stat = stats[barber];
+                var isYou = barber === currentBarber;
+                var isTop3 = i < 3;
+                
+                var displayValue;
+                switch(metric) {
+                    case 'services':
+                        displayValue = Math.round(stat.services) + ' services/month';
+                        break;
+                    case 'products':
+                        displayValue = stat.products.toFixed(1) + ' products/month';
+                        break;
+                    case 'retention':
+                        displayValue = Math.round(stat.retention) + '% retention';
+                        break;
+                    case 'overall':
+                        displayValue = 'Score: ' + Math.round(stat.overall);
+                        break;
+                }
+                
+                var anonymousName = isYou ? 'You' : 'Barber ' + (i + 1);
+                var rankEmoji = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '';
+                
+                var itemDiv = document.createElement('div');
+                itemDiv.className = 'leaderboard-item' + (isYou ? ' you' : '') + (isTop3 && !isYou ? ' top3' : '');
+                
+                itemDiv.innerHTML = 
+                    '<div><strong>' + rankEmoji + ' #' + (i + 1) + ' ' + anonymousName + '</strong></div>' +
+                    '<div>' + displayValue + ' | Tier ' + stat.tier + '</div>';
+                
+                listContainer.appendChild(itemDiv);
+            }
+        }
+        
+        function calculateBarberStats() {
+            var stats = {};
+            var uniqueBarbers = [];
+            
+            // Get unique barber names
+            for (var i = 0; i < barberData.length; i++) {
+                if (uniqueBarbers.indexOf(barberData[i].name) === -1) {
+                    uniqueBarbers.push(barberData[i].name);
+                }
+            }
+            
+            // Calculate stats for each barber
+            for (var i = 0; i < uniqueBarbers.length; i++) {
+                var barber = uniqueBarbers[i];
+                var barberRows = barberData.filter(function(row) {
+                    return row.name === barber;
+                });
+                
+                var totalServices = 0, totalProducts = 0, totalRetention = 0;
+                for (var j = 0; j < barberRows.length; j++) {
+                    totalServices += barberRows[j].services;
+                    totalProducts += barberRows[j].products;
+                    totalRetention += barberRows[j].retention;
+                }
+                
+                var avgServices = totalServices / barberRows.length;
+                var avgProducts = totalProducts / barberRows.length;
+                var avgRetention = totalRetention / barberRows.length;
+                
+                // Determine current tier
+                var startingTier = barberRows[0].startingtier || 1;
+                var currentTier = startingTier;
+                
+                // Count qualified months for tier advancement
+                var tier2QualifiedMonths = 0;
+                var tier3QualifiedMonths = 0;
+                
+                for (var j = 0; j < barberRows.length; j++) {
+                    var row = barberRows[j];
+                    if (row.services >= 200 && row.products >= 7 && row.retention >= 70) {
+                        tier2QualifiedMonths++;
+                    }
+                    if (row.services >= 225 && row.products >= 10 && row.retention >= 80) {
+                        tier3QualifiedMonths++;
+                    }
+                }
+                
+                // Determine actual tier based on qualified months
+                if (startingTier < 3 && tier3QualifiedMonths >= 7) {
+                    currentTier = 3;
+                } else if (startingTier < 2 && tier2QualifiedMonths >= 7) {
+                    currentTier = 2;
+                }
+                
+                // Calculate overall score (weighted combination)
+                var overallScore = (avgServices * 0.4) + (avgProducts * 8) + (avgRetention * 0.6) + (currentTier * 50);
+                
+                stats[barber] = {
+                    services: avgServices,
+                    products: avgProducts,
+                    retention: avgRetention,
+                    tier: currentTier,
+                    overall: overallScore
+                };
+            }
+            
+            return stats;
         }
     </script>
 </body>
