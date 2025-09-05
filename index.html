@@ -66,6 +66,9 @@
         .dashboard { 
             display: none; 
         }
+        .leaderboard {
+            display: none;
+        }
         .metric { 
             border: 2px solid #FFC956; 
             padding: 20px; 
@@ -87,6 +90,40 @@
             margin: 20px 0; 
             border-radius: 8px; 
             border: 2px solid #FFC956; 
+        }
+        .leaderboard-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            margin: 10px 0;
+            border: 2px solid #FFC956;
+            border-radius: 8px;
+            background: #f9f9f9;
+        }
+        .leaderboard-item.you {
+            background: #FFC956;
+            font-weight: bold;
+        }
+        .leaderboard-item.top3 {
+            background: linear-gradient(45deg, #FFC956, #FFF7EC);
+            font-weight: bold;
+        }
+        .leaderboard-tabs {
+            margin: 20px 0;
+            text-align: center;
+        }
+        .leaderboard-tab {
+            margin: 0 10px;
+            padding: 10px 20px;
+            background: #f0f0f0;
+            border: 2px solid #272727;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .leaderboard-tab.active {
+            background: #FFC956;
+            font-weight: bold;
         }
     </style>
 </head>
@@ -131,6 +168,7 @@
         <!-- Dashboard Section -->
         <div id="dashboardSection" class="dashboard">
             <div style="text-align: right; margin-bottom: 20px;">
+                <button id="leaderboardBtn" style="margin-right: 10px; background: #FFC956; border: 2px solid #272727;">🏆 Leaderboard</button>
                 <button id="logoutBtn">Logout</button>
             </div>
             
@@ -158,6 +196,34 @@
             <div class="metric">
                 <h3>Tier Progress</h3>
                 <p id="tierProgress">Progress toward next tier</p>
+                <div id="qualifiedMonths" style="margin-top: 10px; padding: 10px; background: #f0f0f0; border-radius: 5px;">
+                    <strong>Qualified Months Progress:</strong>
+                    <div id="monthsBreakdown"></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Leaderboard Section -->
+        <div id="leaderboardSection" class="leaderboard">
+            <div style="text-align: right; margin-bottom: 20px;">
+                <button id="backToDashboard">Back to Dashboard</button>
+                <button id="logoutBtn2">Logout</button>
+            </div>
+            
+            <h2>🏆 Company Leaderboard</h2>
+            <p style="text-align: center; color: #666; margin-bottom: 20px;">Anonymous rankings • Your position is highlighted</p>
+            
+            <div class="leaderboard-tabs">
+                <button class="leaderboard-tab active" data-metric="services">Services</button>
+                <button class="leaderboard-tab" data-metric="products">Products</button>
+                <button class="leaderboard-tab" data-metric="retention">Retention</button>
+                <button class="leaderboard-tab" data-metric="overall">Overall Score</button>
+            </div>
+            
+            <div id="yourPosition" style="text-align: center; background: #FFC956; padding: 15px; border-radius: 8px; margin: 20px 0; font-weight: bold;"></div>
+            
+            <div id="leaderboardList">
+                <!-- Populated by JavaScript -->
             </div>
         </div>
     </div>
@@ -252,17 +318,32 @@
             password.addEventListener('input', checkForm);
             loginBtn.addEventListener('click', handleLogin);
             
-            // Admin functionality
+            // Event listeners for all buttons
             document.getElementById('adminBtn').addEventListener('click', handleAdminLogin);
             document.getElementById('testCsvBtn').addEventListener('click', testCSV);
             document.getElementById('reloadBtn').addEventListener('click', loadCSVData);
             document.getElementById('logoutBtn').addEventListener('click', logout);
+            document.getElementById('logoutBtn2').addEventListener('click', logout);
+            document.getElementById('leaderboardBtn').addEventListener('click', showLeaderboard);
+            document.getElementById('backToDashboard').addEventListener('click', backToDashboard);
+            
+            // Leaderboard tabs
+            var tabs = document.querySelectorAll('.leaderboard-tab');
+            for (var i = 0; i < tabs.length; i++) {
+                tabs[i].addEventListener('click', function() {
+                    var allTabs = document.querySelectorAll('.leaderboard-tab');
+                    for (var j = 0; j < allTabs.length; j++) {
+                        allTabs[j].classList.remove('active');
+                    }
+                    this.classList.add('active');
+                    updateLeaderboard(this.getAttribute('data-metric'));
+                });
+            }
         }
 
         function handleLogin() {
             var selectedName = document.getElementById('barberSelect').value;
             var enteredPassword = document.getElementById('passwordInput').value.trim();
-            var errorMsg = document.getElementById('errorMsg');
             
             var barberRows = barberData.filter(function(row) {
                 return row.name === selectedName;
@@ -337,9 +418,30 @@
             var avgProducts = totalProducts / barberRows.length;
             var avgRetention = totalRetention / barberRows.length;
             
-            // Determine current tier
+            // Determine current tier and calculate qualified months
             var startingTier = barberRows[0].startingtier || 1;
             var currentTier = startingTier;
+            
+            // Count qualified months for each tier
+            var tier2QualifiedMonths = 0;
+            var tier3QualifiedMonths = 0;
+            
+            for (var i = 0; i < barberRows.length; i++) {
+                var row = barberRows[i];
+                if (row.services >= 200 && row.products >= 7 && row.retention >= 70) {
+                    tier2QualifiedMonths++;
+                }
+                if (row.services >= 225 && row.products >= 10 && row.retention >= 80) {
+                    tier3QualifiedMonths++;
+                }
+            }
+            
+            // Determine actual current tier
+            if (startingTier < 3 && tier3QualifiedMonths >= 7) {
+                currentTier = 3;
+            } else if (startingTier < 2 && tier2QualifiedMonths >= 7) {
+                currentTier = 2;
+            }
             
             // Update display
             document.getElementById('barberName').textContent = barberName;
@@ -366,10 +468,63 @@
             }
             
             document.getElementById('tierProgress').textContent = 'Currently Tier ' + currentTier + ' - Keep up the great work!';
+            
+            // Show qualified months progress
+            updateQualifiedMonthsDisplay(currentTier, tier2QualifiedMonths, tier3QualifiedMonths, barberRows.length);
+        }
+
+        function updateQualifiedMonthsDisplay(currentTier, tier2Months, tier3Months, totalMonths) {
+            var breakdown = document.getElementById('monthsBreakdown');
+            var html = '';
+            
+            if (currentTier === 1) {
+                // Working toward Tier 2
+                var monthsNeeded = Math.max(0, 7 - tier2Months);
+                html += '<div>📊 Tier 2 Progress: ' + tier2Months + '/7 qualified months</div>';
+                if (monthsNeeded > 0) {
+                    html += '<div style="color: #666;">Need ' + monthsNeeded + ' more qualifying months for Tier 2</div>';
+                } else {
+                    html += '<div style="color: green;">✅ Ready for Tier 2 promotion!</div>';
+                }
+                html += '<div style="font-size: 0.9em; margin-top: 5px;">Qualifying month: 200+ services, 7+ products, 70%+ retention</div>';
+                
+            } else if (currentTier === 2) {
+                // Working toward Tier 3
+                var monthsNeeded = Math.max(0, 7 - tier3Months);
+                html += '<div>📊 Tier 3 Progress: ' + tier3Months + '/7 qualified months</div>';
+                if (monthsNeeded > 0) {
+                    html += '<div style="color: #666;">Need ' + monthsNeeded + ' more qualifying months for Tier 3</div>';
+                } else {
+                    html += '<div style="color: green;">✅ Ready for Tier 3 promotion!</div>';
+                }
+                html += '<div style="font-size: 0.9em; margin-top: 5px;">Qualifying month: 225+ services, 10+ products, 80%+ retention</div>';
+                
+            } else {
+                // Already at Tier 3
+                html += '<div style="color: green;">🏆 Maximum Tier Achieved!</div>';
+                html += '<div>Tier 3 qualified months: ' + tier3Months + '/7 ✅</div>';
+            }
+            
+            html += '<div style="margin-top: 10px; font-size: 0.9em; color: #666;">Total months of data: ' + totalMonths + '</div>';
+            
+            breakdown.innerHTML = html;
         }
 
         function showDashboard() {
             document.getElementById('loginSection').style.display = 'none';
+            document.getElementById('dashboardSection').style.display = 'block';
+            document.getElementById('leaderboardSection').style.display = 'none';
+        }
+        
+        function showLeaderboard() {
+            document.getElementById('loginSection').style.display = 'none';
+            document.getElementById('dashboardSection').style.display = 'none';
+            document.getElementById('leaderboardSection').style.display = 'block';
+            updateLeaderboard('overall');
+        }
+        
+        function backToDashboard() {
+            document.getElementById('leaderboardSection').style.display = 'none';
             document.getElementById('dashboardSection').style.display = 'block';
         }
 
