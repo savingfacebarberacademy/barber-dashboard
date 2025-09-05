@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Barber Dashboard</title>
+    <title>Barber Dashboard - UPDATED VERSION</title>
     <style>
         body { 
             font-family: Arial, sans-serif; 
@@ -125,11 +125,17 @@
             background: #FFC956;
             font-weight: bold;
         }
+        .debug-btn {
+            background: #ff6666 !important;
+            color: white !important;
+            margin: 5px;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <h1 style="text-align: center; color: #272727;">SAVING FACE Barber Dashboard</h1>
+        <h2 style="text-align: center; color: #666; font-size: 1em;">UPDATED VERSION - Check line count!</h2>
         
         <!-- Login Section -->
         <div id="loginSection" class="login-form">
@@ -160,7 +166,9 @@
                     <p>CSV Status: <span id="csvStatus">Unknown</span></p>
                     <button id="testCsvBtn">Test CSV File</button>
                     <button id="reloadBtn">Reload Data</button>
-                    <div id="debugInfo" style="margin-top: 10px; font-family: monospace; background: #eee; padding: 10px; border-radius: 5px; display: none;"></div>
+                    <button id="debugBtn" class="debug-btn">🐛 DEBUG LEADERBOARD</button>
+                    <button id="forceLeaderboard" class="debug-btn">🚀 FORCE LEADERBOARD TEST</button>
+                    <div id="debugOutput" style="margin-top: 15px; padding: 10px; background: #eee; font-family: monospace; font-size: 12px; max-height: 200px; overflow-y: auto; display: none;"></div>
                 </div>
             </div>
         </div>
@@ -194,11 +202,11 @@
             </div>
             
             <div class="metric">
-                <h3>Tier Progress</h3>
+                <h3>Tier Progress & Qualified Months</h3>
                 <p id="tierProgress">Progress toward next tier</p>
                 <div id="qualifiedMonths" style="margin-top: 10px; padding: 10px; background: #f0f0f0; border-radius: 5px;">
                     <strong>Qualified Months Progress:</strong>
-                    <div id="monthsBreakdown"></div>
+                    <div id="monthsBreakdown">Loading...</div>
                 </div>
             </div>
         </div>
@@ -223,7 +231,7 @@
             <div id="yourPosition" style="text-align: center; background: #FFC956; padding: 15px; border-radius: 8px; margin: 20px 0; font-weight: bold;"></div>
             
             <div id="leaderboardList">
-                <!-- Populated by JavaScript -->
+                <p>Loading leaderboard...</p>
             </div>
         </div>
     </div>
@@ -326,6 +334,8 @@
             document.getElementById('logoutBtn2').addEventListener('click', logout);
             document.getElementById('leaderboardBtn').addEventListener('click', showLeaderboard);
             document.getElementById('backToDashboard').addEventListener('click', backToDashboard);
+            document.getElementById('debugBtn').addEventListener('click', runDebugReport);
+            document.getElementById('forceLeaderboard').addEventListener('click', forceLeaderboardTest);
             
             // Leaderboard tabs
             var tabs = document.querySelectorAll('.leaderboard-tab');
@@ -370,7 +380,7 @@
             if (adminPassword === 'admin2024') {
                 isAdmin = true;
                 document.getElementById('adminPanel').style.display = 'block';
-                document.getElementById('csvStatus').textContent = 'Admin access granted';
+                document.getElementById('csvStatus').textContent = 'Admin access granted - ' + barberData.length + ' records loaded';
                 hideError();
             } else {
                 showError('Incorrect admin password');
@@ -378,25 +388,85 @@
         }
 
         function testCSV() {
-            var debugInfo = document.getElementById('debugInfo');
-            debugInfo.style.display = 'block';
-            debugInfo.textContent = 'Testing CSV access...\n';
+            var debugOutput = document.getElementById('debugOutput');
+            debugOutput.style.display = 'block';
+            debugOutput.textContent = 'Testing CSV access...\n';
             
             fetch('./barber-data.csv?test=' + Date.now())
                 .then(function(response) {
-                    debugInfo.textContent += 'Response status: ' + response.status + '\n';
+                    debugOutput.textContent += 'Response status: ' + response.status + '\n';
                     if (response.ok) {
                         return response.text();
                     }
                     throw new Error('HTTP ' + response.status);
                 })
                 .then(function(text) {
-                    debugInfo.textContent += 'Success! File size: ' + text.length + ' characters\n';
-                    debugInfo.textContent += 'First 100 chars: ' + text.substring(0, 100) + '...\n';
+                    debugOutput.textContent += 'Success! File size: ' + text.length + ' characters\n';
+                    debugOutput.textContent += 'First 100 chars: ' + text.substring(0, 100) + '...\n';
                 })
                 .catch(function(error) {
-                    debugInfo.textContent += 'Error: ' + error.message + '\n';
+                    debugOutput.textContent += 'Error: ' + error.message + '\n';
                 });
+        }
+
+        function runDebugReport() {
+            var debugOutput = document.getElementById('debugOutput');
+            debugOutput.style.display = 'block';
+            
+            var report = 'LEADERBOARD DEBUG REPORT:\n';
+            report += '========================\n';
+            report += '1. barberData.length: ' + barberData.length + '\n';
+            
+            if (barberData.length > 0) {
+                report += '2. Sample row: ' + JSON.stringify(barberData[0]) + '\n';
+                
+                var uniqueBarbers = getUniqueBarbers();
+                report += '3. Unique barbers: ' + uniqueBarbers.length + ' found\n';
+                report += '   Names: ' + uniqueBarbers.join(', ') + '\n';
+                
+                try {
+                    var stats = calculateBarberStats();
+                    var statKeys = Object.keys(stats);
+                    report += '4. Stats calculated: ' + statKeys.length + ' barbers\n';
+                    
+                    if (statKeys.length > 0) {
+                        report += '5. Sample stats: ' + JSON.stringify(stats[statKeys[0]]) + '\n';
+                    } else {
+                        report += '5. ERROR: No stats calculated!\n';
+                    }
+                } catch (error) {
+                    report += '4. ERROR in calculateBarberStats: ' + error.message + '\n';
+                    report += '   Stack: ' + error.stack + '\n';
+                }
+            } else {
+                report += '2. ERROR: No barber data loaded!\n';
+            }
+            
+            debugOutput.textContent = report;
+        }
+
+        function forceLeaderboardTest() {
+            var debugOutput = document.getElementById('debugOutput');
+            debugOutput.style.display = 'block';
+            debugOutput.textContent = 'FORCING LEADERBOARD UPDATE...\n';
+            
+            try {
+                updateLeaderboard('overall');
+                debugOutput.textContent += 'Leaderboard update completed successfully!\n';
+            } catch (error) {
+                debugOutput.textContent += 'ERROR in updateLeaderboard: ' + error.message + '\n';
+                debugOutput.textContent += 'Stack: ' + error.stack + '\n';
+            }
+        }
+
+        function getUniqueBarbers() {
+            var uniqueBarbers = [];
+            for (var i = 0; i < barberData.length; i++) {
+                if (uniqueBarbers.indexOf(barberData[i].name) === -1) {
+                    uniqueBarbers.push(barberData[i].name);
+                }
+            }
+            return uniqueBarbers;
         }
 
         function displayBarberData(barberName) {
@@ -406,7 +476,7 @@
             
             if (barberRows.length === 0) return;
             
-            // Calculate averages
+            // Calculate averages (using all available data for now)
             var totalServices = 0, totalProducts = 0, totalRetention = 0;
             for (var i = 0; i < barberRows.length; i++) {
                 totalServices += barberRows[i].services;
@@ -478,7 +548,6 @@
             var html = '';
             
             if (currentTier === 1) {
-                // Working toward Tier 2
                 var monthsNeeded = Math.max(0, 7 - tier2Months);
                 html += '<div>📊 Tier 2 Progress: ' + tier2Months + '/7 qualified months</div>';
                 if (monthsNeeded > 0) {
@@ -489,7 +558,6 @@
                 html += '<div style="font-size: 0.9em; margin-top: 5px;">Qualifying month: 200+ services, 7+ products, 70%+ retention</div>';
                 
             } else if (currentTier === 2) {
-                // Working toward Tier 3
                 var monthsNeeded = Math.max(0, 7 - tier3Months);
                 html += '<div>📊 Tier 3 Progress: ' + tier3Months + '/7 qualified months</div>';
                 if (monthsNeeded > 0) {
@@ -500,7 +568,6 @@
                 html += '<div style="font-size: 0.9em; margin-top: 5px;">Qualifying month: 225+ services, 10+ products, 80%+ retention</div>';
                 
             } else {
-                // Already at Tier 3
                 html += '<div style="color: green;">🏆 Maximum Tier Achieved!</div>';
                 html += '<div>Tier 3 qualified months: ' + tier3Months + '/7 ✅</div>';
             }
@@ -552,83 +619,86 @@
             document.getElementById('errorMsg').style.display = 'none';
         }
         
-        // Leaderboard functions
         function updateLeaderboard(metric) {
-            var stats = calculateBarberStats();
-            var barberNames = Object.keys(stats);
-            
-            // Sort by metric
-            barberNames.sort(function(a, b) {
-                return stats[b][metric] - stats[a][metric];
-            });
-            
-            // Show your position
-            var yourPosition = document.getElementById('yourPosition');
-            if (currentBarber) {
-                var yourRank = barberNames.indexOf(currentBarber) + 1;
-                yourPosition.textContent = '🎯 Your Position: #' + yourRank + ' of ' + barberNames.length + ' barbers';
-                yourPosition.style.display = 'block';
-            } else {
-                yourPosition.style.display = 'none';
-            }
-            
-            // Create leaderboard list
             var listContainer = document.getElementById('leaderboardList');
-            listContainer.innerHTML = '';
             
-            for (var i = 0; i < barberNames.length; i++) {
-                var barber = barberNames[i];
-                var stat = stats[barber];
-                var isYou = barber === currentBarber;
-                var isTop3 = i < 3;
+            try {
+                var stats = calculateBarberStats();
+                var barberNames = Object.keys(stats);
                 
-                var displayValue;
-                switch(metric) {
-                    case 'services':
-                        displayValue = Math.round(stat.services) + ' services/month';
-                        break;
-                    case 'products':
-                        displayValue = stat.products.toFixed(1) + ' products/month';
-                        break;
-                    case 'retention':
-                        displayValue = Math.round(stat.retention) + '% retention';
-                        break;
-                    case 'overall':
-                        displayValue = 'Score: ' + Math.round(stat.overall);
-                        break;
+                if (barberNames.length === 0) {
+                    listContainer.innerHTML = '<p style="color: red;">No barber stats calculated! Check debug report.</p>';
+                    return;
                 }
                 
-                var anonymousName = isYou ? 'You' : 'Barber ' + (i + 1);
-                var rankEmoji = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '';
+                // Sort by metric
+                barberNames.sort(function(a, b) {
+                    return stats[b][metric] - stats[a][metric];
+                });
                 
-                var itemDiv = document.createElement('div');
-                itemDiv.className = 'leaderboard-item' + (isYou ? ' you' : '') + (isTop3 && !isYou ? ' top3' : '');
+                // Show your position
+                var yourPosition = document.getElementById('yourPosition');
+                if (currentBarber) {
+                    var yourRank = barberNames.indexOf(currentBarber) + 1;
+                    yourPosition.textContent = '🎯 Your Position: #' + yourRank + ' of ' + barberNames.length + ' barbers';
+                    yourPosition.style.display = 'block';
+                } else {
+                    yourPosition.style.display = 'none';
+                }
                 
-                itemDiv.innerHTML = 
-                    '<div><strong>' + rankEmoji + ' #' + (i + 1) + ' ' + anonymousName + '</strong></div>' +
-                    '<div>' + displayValue + ' | Tier ' + stat.tier + '</div>';
+                // Create leaderboard list
+                listContainer.innerHTML = '';
                 
-                listContainer.appendChild(itemDiv);
+                for (var i = 0; i < barberNames.length; i++) {
+                    var barber = barberNames[i];
+                    var stat = stats[barber];
+                    var isYou = barber === currentBarber;
+                    var isTop3 = i < 3;
+                    
+                    var displayValue;
+                    switch(metric) {
+                        case 'services':
+                            displayValue = Math.round(stat.services) + ' services/month';
+                            break;
+                        case 'products':
+                            displayValue = stat.products.toFixed(1) + ' products/month';
+                            break;
+                        case 'retention':
+                            displayValue = Math.round(stat.retention) + '% retention';
+                            break;
+                        case 'overall':
+                            displayValue = 'Score: ' + Math.round(stat.overall);
+                            break;
+                    }
+                    
+                    var anonymousName = isYou ? 'You' : 'Barber ' + (i + 1);
+                    var rankEmoji = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '';
+                    
+                    var itemDiv = document.createElement('div');
+                    itemDiv.className = 'leaderboard-item' + (isYou ? ' you' : '') + (isTop3 && !isYou ? ' top3' : '');
+                    
+                    itemDiv.innerHTML = 
+                        '<div><strong>' + rankEmoji + ' #' + (i + 1) + ' ' + anonymousName + '</strong></div>' +
+                        '<div>' + displayValue + ' | Tier ' + stat.tier + '</div>';
+                    
+                    listContainer.appendChild(itemDiv);
+                }
+            } catch (error) {
+                listContainer.innerHTML = '<p style="color: red;">Error creating leaderboard: ' + error.message + '</p>';
             }
         }
         
         function calculateBarberStats() {
             var stats = {};
-            var uniqueBarbers = [];
+            var uniqueBarbers = getUniqueBarbers();
             
-            // Get unique barber names
-            for (var i = 0; i < barberData.length; i++) {
-                if (uniqueBarbers.indexOf(barberData[i].name) === -1) {
-                    uniqueBarbers.push(barberData[i].name);
-                }
-            }
-            
-            // Calculate stats for each barber
             for (var i = 0; i < uniqueBarbers.length; i++) {
                 var barber = uniqueBarbers[i];
                 var barberRows = barberData.filter(function(row) {
                     return row.name === barber;
                 });
+                
+                if (barberRows.length === 0) continue;
                 
                 var totalServices = 0, totalProducts = 0, totalRetention = 0;
                 for (var j = 0; j < barberRows.length; j++) {
@@ -645,12 +715,12 @@
                 var startingTier = barberRows[0].startingtier || 1;
                 var currentTier = startingTier;
                 
-                // Count qualified months for tier advancement from recent 12 months
+                // Count qualified months for tier advancement
                 var tier2QualifiedMonths = 0;
                 var tier3QualifiedMonths = 0;
                 
-                for (var j = 0; j < recent12Months.length; j++) {
-                    var row = recent12Months[j];
+                for (var j = 0; j < barberRows.length; j++) {
+                    var row = barberRows[j];
                     if (row.services >= 200 && row.products >= 7 && row.retention >= 70) {
                         tier2QualifiedMonths++;
                     }
