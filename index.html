@@ -12,7 +12,7 @@
             min-height: 100vh;
         }
         .container { 
-            max-width: 800px; 
+            max-width: 1000px; 
             margin: 0 auto; 
             background: white; 
             padding: 30px; 
@@ -130,12 +130,99 @@
             color: white !important;
             margin: 5px;
         }
+        
+        /* 12-Month History Styles */
+        .history-section {
+            background: #f9f9f9;
+            border: 2px solid #FFC956;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .history-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .current-month-badge {
+            background: #FFC956;
+            color: #272727;
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-size: 0.9em;
+            font-weight: bold;
+        }
+        .months-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .month-card {
+            background: white;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            padding: 12px;
+            text-align: center;
+            position: relative;
+        }
+        .month-card.current {
+            border-color: #FFC956;
+            background: #FFF7EC;
+            font-weight: bold;
+        }
+        .month-card.qualified {
+            border-color: #28a745;
+            background: #f8fff8;
+        }
+        .month-card.qualified::after {
+            content: '✅';
+            position: absolute;
+            top: 5px;
+            right: 8px;
+            font-size: 12px;
+        }
+        .month-name {
+            font-weight: bold;
+            color: #272727;
+            margin-bottom: 8px;
+        }
+        .month-stats {
+            font-size: 0.85em;
+            line-height: 1.3;
+        }
+        .trend-indicator {
+            font-size: 1.2em;
+            margin-left: 5px;
+        }
+        .summary-bar {
+            background: #272727;
+            color: white;
+            padding: 15px;
+            border-radius: 5px;
+            text-align: center;
+            margin-top: 15px;
+        }
+        .admin-controls {
+            background: #e9ecef;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            border: 2px dashed #6c757d;
+        }
+        .current-month-metrics {
+            display: grid; 
+            grid-template-columns: 1fr 1fr 1fr; 
+            gap: 20px; 
+            text-align: center;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <h1 style="text-align: center; color: #272727;">SAVING FACE Barber Dashboard</h1>
-        <h2 style="text-align: center; color: #666; font-size: 1em;">UPDATED VERSION - Check line count!</h2>
+        <h2 style="text-align: center; color: #666; font-size: 1em;">UPDATED VERSION - Now with 12-Month History!</h2>
         
         <!-- Login Section -->
         <div id="loginSection" class="login-form">
@@ -175,6 +262,17 @@
         
         <!-- Dashboard Section -->
         <div id="dashboardSection" class="dashboard">
+            <!-- Admin Controls for Current Month (only shows if admin) -->
+            <div id="adminCurrentMonth" class="admin-controls" style="display: none;">
+                <strong>🔧 Admin Controls:</strong>
+                <label style="margin-left: 15px;">Current Month for Calculations: 
+                    <select id="currentMonthSelect" style="margin-left: 5px; padding: 5px; width: auto;">
+                        <option value="auto">Auto-detect (Latest Month)</option>
+                    </select>
+                </label>
+                <button onclick="updateCurrentMonth()" style="margin-left: 10px; padding: 5px 10px; font-size: 14px;">Update</button>
+            </div>
+            
             <div style="text-align: right; margin-bottom: 20px;">
                 <button id="leaderboardBtn" style="margin-right: 10px; background: #FFC956; border: 2px solid #272727;">🏆 Leaderboard</button>
                 <button id="logoutBtn">Logout</button>
@@ -183,6 +281,61 @@
             <h2 id="barberName">Barber Name</h2>
             <p>Current Tier: <span id="currentTier">1</span> | Location: <span id="location">Unknown</span></p>
             
+            <!-- Current Month Performance -->
+            <div class="metric">
+                <h3 id="currentMonthTitle">Current Month Performance</h3>
+                <div class="current-month-metrics">
+                    <div>
+                        <div class="metric-value" id="currentMonthServices">0</div>
+                        <div>Services <span id="servicesTrend" class="trend-indicator"></span></div>
+                    </div>
+                    <div>
+                        <div class="metric-value" id="currentMonthProducts">0</div>
+                        <div>Products <span id="productsTrend" class="trend-indicator"></span></div>
+                    </div>
+                    <div>
+                        <div class="metric-value" id="currentMonthRetention">0%</div>
+                        <div>Retention <span id="retentionTrend" class="trend-indicator"></span></div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 12-Month History -->
+            <div class="history-section">
+                <div class="history-header">
+                    <h3 style="margin: 0; color: #272727;">📊 12-Month Performance History</h3>
+                    <div class="current-month-badge" id="currentMonthBadge">Current: Loading...</div>
+                </div>
+                
+                <div class="months-grid" id="monthsGrid">
+                    <p>Loading 12-month history...</p>
+                </div>
+                
+                <div class="summary-bar" id="summaryBar">
+                    Loading summary...
+                </div>
+            </div>
+            
+            <!-- 12-Month Averages -->
+            <div class="metric">
+                <h3>12-Month Averages</h3>
+                <div class="current-month-metrics">
+                    <div>
+                        <div class="metric-value" id="avgServices">0</div>
+                        <div>Avg Services/Month</div>
+                    </div>
+                    <div>
+                        <div class="metric-value" id="avgProducts">0</div>
+                        <div>Avg Products/Month</div>
+                    </div>
+                    <div>
+                        <div class="metric-value" id="avgRetention">0%</div>
+                        <div>Avg Retention</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Legacy metrics (keeping for compatibility) -->
             <div class="metric">
                 <h3>Services Per Month</h3>
                 <div class="metric-value" id="servicesValue">0</div>
@@ -240,6 +393,8 @@
         var barberData = [];
         var currentBarber = null;
         var isAdmin = false;
+        var currentMonth = 'auto'; // Admin-controlled current month
+        var availableMonths = []; // List of all months in the data
 
         // Load CSV data when page loads
         loadCSVData();
@@ -259,6 +414,7 @@
                     parseCSV(csvText);
                     document.getElementById('loadStatus').textContent = 'Data loaded successfully! (' + barberData.length + ' records)';
                     populateBarberSelect();
+                    populateMonthSelect();
                 })
                 .catch(function(error) {
                     document.getElementById('loadStatus').textContent = 'Error loading data: ' + error.message;
@@ -271,6 +427,8 @@
             var headers = lines[0].split(',').map(function(h) { return h.trim().toLowerCase(); });
             
             barberData = [];
+            var monthsSet = new Set();
+            
             for (var i = 1; i < lines.length; i++) {
                 var line = lines[i].trim();
                 if (!line) continue;
@@ -289,6 +447,48 @@
                 row.startingtier = parseInt(row.startingtier) || 1;
                 
                 barberData.push(row);
+                monthsSet.add(row.month);
+            }
+            
+            // Sort months chronologically (assuming format like "Jan 2024")
+            availableMonths = Array.from(monthsSet).sort(function(a, b) {
+                return new Date(a) - new Date(b);
+            });
+        }
+
+        function populateMonthSelect() {
+            var select = document.getElementById('currentMonthSelect');
+            if (!select) return;
+            
+            // Clear existing options except auto-detect
+            var autoOption = select.querySelector('option[value="auto"]');
+            select.innerHTML = '';
+            select.appendChild(autoOption);
+            
+            // Add all available months
+            for (var i = availableMonths.length - 1; i >= 0; i--) { // Reverse order (newest first)
+                var option = document.createElement('option');
+                option.value = availableMonths[i];
+                option.textContent = availableMonths[i];
+                select.appendChild(option);
+            }
+        }
+
+        function getCurrentMonth() {
+            if (currentMonth === 'auto') {
+                return availableMonths[availableMonths.length - 1]; // Latest month
+            }
+            return currentMonth;
+        }
+
+        function updateCurrentMonth() {
+            var select = document.getElementById('currentMonthSelect');
+            currentMonth = select.value;
+            
+            // Refresh the current barber's data if someone is logged in
+            if (currentBarber) {
+                displayBarberData(currentBarber);
+                show12MonthHistory(currentBarber);
             }
         }
 
@@ -372,6 +572,7 @@
             currentBarber = selectedName;
             showDashboard();
             displayBarberData(selectedName);
+            show12MonthHistory(selectedName);
             hideError();
         }
 
@@ -381,9 +582,166 @@
                 isAdmin = true;
                 document.getElementById('adminPanel').style.display = 'block';
                 document.getElementById('csvStatus').textContent = 'Admin access granted - ' + barberData.length + ' records loaded';
+                
+                // Show admin controls for current month
+                document.getElementById('adminCurrentMonth').style.display = 'block';
+                
                 hideError();
             } else {
                 showError('Incorrect admin password');
+            }
+        }
+
+        function show12MonthHistory(barberName) {
+            var barberRows = barberData.filter(function(row) {
+                return row.name === barberName;
+            });
+            
+            if (barberRows.length === 0) return;
+            
+            var monthsGrid = document.getElementById('monthsGrid');
+            var currentMonthForCalcs = getCurrentMonth();
+            
+            // Update current month badge
+            document.getElementById('currentMonthBadge').textContent = 'Current: ' + currentMonthForCalcs;
+            
+            // Get last 12 months from current month
+            var currentMonthIndex = availableMonths.indexOf(currentMonthForCalcs);
+            var last12Months = [];
+            
+            for (var i = Math.max(0, currentMonthIndex - 11); i <= currentMonthIndex; i++) {
+                last12Months.push(availableMonths[i]);
+            }
+            
+            // Create month cards
+            monthsGrid.innerHTML = '';
+            
+            var tier2QualifiedCount = 0;
+            var tier3QualifiedCount = 0;
+            var totalServices = 0, totalProducts = 0, totalRetention = 0;
+            var validMonths = 0;
+            
+            for (var i = 0; i < last12Months.length; i++) {
+                var month = last12Months[i];
+                var monthData = barberRows.find(function(row) {
+                    return row.month === month;
+                });
+                
+                var card = document.createElement('div');
+                card.className = 'month-card';
+                
+                if (month === currentMonthForCalcs) {
+                    card.classList.add('current');
+                }
+                
+                var isQualified = false;
+                var content = '<div class="month-name">' + month + '</div>';
+                
+                if (monthData) {
+                    validMonths++;
+                    totalServices += monthData.services;
+                    totalProducts += monthData.products;
+                    totalRetention += monthData.retention;
+                    
+                    // Check if qualified for tier advancement
+                    if (monthData.services >= 200 && monthData.products >= 7 && monthData.retention >= 70) {
+                        tier2QualifiedCount++;
+                        isQualified = true;
+                    }
+                    if (monthData.services >= 225 && monthData.products >= 10 && monthData.retention >= 80) {
+                        tier3QualifiedCount++;
+                        isQualified = true;
+                    }
+                    
+                    if (isQualified) {
+                        card.classList.add('qualified');
+                    }
+                    
+                    content += '<div class="month-stats">' +
+                        'Services: ' + monthData.services + '<br>' +
+                        'Products: ' + monthData.products.toFixed(1) + '<br>' +
+                        'Retention: ' + Math.round(monthData.retention) + '%' +
+                        '</div>';
+                } else {
+                    content += '<div class="month-stats" style="color: #999;">No data</div>';
+                }
+                
+                card.innerHTML = content;
+                monthsGrid.appendChild(card);
+            }
+            
+            // Update summary bar
+            var avgServices = validMonths > 0 ? Math.round(totalServices / validMonths) : 0;
+            var avgProducts = validMonths > 0 ? (totalProducts / validMonths).toFixed(1) : 0;
+            var avgRetention = validMonths > 0 ? Math.round(totalRetention / validMonths) : 0;
+            
+            var summaryBar = document.getElementById('summaryBar');
+            summaryBar.innerHTML = 
+                '<strong>Tier 2 Progress:</strong> ' + tier2QualifiedCount + '/7 qualified months ' + 
+                (tier2QualifiedCount >= 7 ? '✅' : '') + ' | ' +
+                '<strong>Tier 3 Progress:</strong> ' + tier3QualifiedCount + '/7 qualified months ' + 
+                (tier3QualifiedCount >= 7 ? '✅' : '') + ' | ' +
+                '<strong>12-Month Average:</strong> ' + avgServices + ' services, ' + avgProducts + ' products, ' + avgRetention + '% retention';
+            
+            // Update 12-month averages display
+            document.getElementById('avgServices').textContent = avgServices;
+            document.getElementById('avgProducts').textContent = avgProducts;
+            document.getElementById('avgRetention').textContent = avgRetention + '%';
+            
+            // Update current month display
+            updateCurrentMonthDisplay(barberName, currentMonthForCalcs);
+        }
+
+        function updateCurrentMonthDisplay(barberName, currentMonthForCalcs) {
+            var barberRows = barberData.filter(function(row) {
+                return row.name === barberName;
+            });
+            
+            var currentMonthData = barberRows.find(function(row) {
+                return row.month === currentMonthForCalcs;
+            });
+            
+            document.getElementById('currentMonthTitle').textContent = 'Current Month Performance (' + currentMonthForCalcs + ')';
+            
+            if (currentMonthData) {
+                document.getElementById('currentMonthServices').textContent = currentMonthData.services;
+                document.getElementById('currentMonthProducts').textContent = currentMonthData.products.toFixed(1);
+                document.getElementById('currentMonthRetention').textContent = Math.round(currentMonthData.retention) + '%';
+                
+                // Calculate trends (compare to previous month if available)
+                var currentIndex = availableMonths.indexOf(currentMonthForCalcs);
+                if (currentIndex > 0) {
+                    var prevMonth = availableMonths[currentIndex - 1];
+                    var prevMonthData = barberRows.find(function(row) {
+                        return row.month === prevMonth;
+                    });
+                    
+                    if (prevMonthData) {
+                        document.getElementById('servicesTrend').textContent = 
+                            currentMonthData.services > prevMonthData.services ? '📈' : 
+                            currentMonthData.services < prevMonthData.services ? '📉' : '➡️';
+                        
+                        document.getElementById('productsTrend').textContent = 
+                            currentMonthData.products > prevMonthData.products ? '📈' : 
+                            currentMonthData.products < prevMonthData.products ? '📉' : '➡️';
+                        
+                        document.getElementById('retentionTrend').textContent = 
+                            currentMonthData.retention > prevMonthData.retention ? '📈' : 
+                            currentMonthData.retention < prevMonthData.retention ? '📉' : '➡️';
+                    }
+                } else {
+                    // First month, no trend data
+                    document.getElementById('servicesTrend').textContent = '🆕';
+                    document.getElementById('productsTrend').textContent = '🆕';
+                    document.getElementById('retentionTrend').textContent = '🆕';
+                }
+            } else {
+                document.getElementById('currentMonthServices').textContent = 'N/A';
+                document.getElementById('currentMonthProducts').textContent = 'N/A';
+                document.getElementById('currentMonthRetention').textContent = 'N/A';
+                document.getElementById('servicesTrend').textContent = '';
+                document.getElementById('productsTrend').textContent = '';
+                document.getElementById('retentionTrend').textContent = '';
             }
         }
 
@@ -416,30 +774,33 @@
             var report = 'LEADERBOARD DEBUG REPORT:\n';
             report += '========================\n';
             report += '1. barberData.length: ' + barberData.length + '\n';
+            report += '2. availableMonths: ' + availableMonths.join(', ') + '\n';
+            report += '3. currentMonth setting: ' + currentMonth + '\n';
+            report += '4. getCurrentMonth(): ' + getCurrentMonth() + '\n';
             
             if (barberData.length > 0) {
-                report += '2. Sample row: ' + JSON.stringify(barberData[0]) + '\n';
+                report += '5. Sample row: ' + JSON.stringify(barberData[0]) + '\n';
                 
                 var uniqueBarbers = getUniqueBarbers();
-                report += '3. Unique barbers: ' + uniqueBarbers.length + ' found\n';
+                report += '6. Unique barbers: ' + uniqueBarbers.length + ' found\n';
                 report += '   Names: ' + uniqueBarbers.join(', ') + '\n';
                 
                 try {
                     var stats = calculateBarberStats();
                     var statKeys = Object.keys(stats);
-                    report += '4. Stats calculated: ' + statKeys.length + ' barbers\n';
+                    report += '7. Stats calculated: ' + statKeys.length + ' barbers\n';
                     
                     if (statKeys.length > 0) {
-                        report += '5. Sample stats: ' + JSON.stringify(stats[statKeys[0]]) + '\n';
+                        report += '8. Sample stats: ' + JSON.stringify(stats[statKeys[0]]) + '\n';
                     } else {
-                        report += '5. ERROR: No stats calculated!\n';
+                        report += '8. ERROR: No stats calculated!\n';
                     }
                 } catch (error) {
-                    report += '4. ERROR in calculateBarberStats: ' + error.message + '\n';
+                    report += '7. ERROR in calculateBarberStats: ' + error.message + '\n';
                     report += '   Stack: ' + error.stack + '\n';
                 }
             } else {
-                report += '2. ERROR: No barber data loaded!\n';
+                report += '5. ERROR: No barber data loaded!\n';
             }
             
             debugOutput.textContent = report;
@@ -476,7 +837,10 @@
             
             if (barberRows.length === 0) return;
             
-            // Calculate averages (using all available data for now)
+            // Use current month for calculations (admin-controlled)
+            var currentMonthForCalcs = getCurrentMonth();
+            
+            // Calculate averages (using all available data for compatibility)
             var totalServices = 0, totalProducts = 0, totalRetention = 0;
             for (var i = 0; i < barberRows.length; i++) {
                 totalServices += barberRows[i].services;
@@ -603,9 +967,11 @@
             document.getElementById('passwordInput').value = '';
             document.getElementById('adminPassword').value = '';
             document.getElementById('adminPanel').style.display = 'none';
+            document.getElementById('adminCurrentMonth').style.display = 'none';
             document.getElementById('loginBtn').disabled = true;
             currentBarber = null;
             isAdmin = false;
+            currentMonth = 'auto';
             hideError();
         }
 
@@ -691,6 +1057,7 @@
         function calculateBarberStats() {
             var stats = {};
             var uniqueBarbers = getUniqueBarbers();
+            var currentMonthForCalcs = getCurrentMonth();
             
             for (var i = 0; i < uniqueBarbers.length; i++) {
                 var barber = uniqueBarbers[i];
@@ -700,16 +1067,31 @@
                 
                 if (barberRows.length === 0) continue;
                 
-                var totalServices = 0, totalProducts = 0, totalRetention = 0;
-                for (var j = 0; j < barberRows.length; j++) {
-                    totalServices += barberRows[j].services;
-                    totalProducts += barberRows[j].products;
-                    totalRetention += barberRows[j].retention;
-                }
+                // For leaderboard, use current month data if available, otherwise use averages
+                var currentMonthData = barberRows.find(function(row) {
+                    return row.month === currentMonthForCalcs;
+                });
                 
-                var avgServices = totalServices / barberRows.length;
-                var avgProducts = totalProducts / barberRows.length;
-                var avgRetention = totalRetention / barberRows.length;
+                var services, products, retention;
+                
+                if (currentMonthData) {
+                    // Use current month data for leaderboard
+                    services = currentMonthData.services;
+                    products = currentMonthData.products;
+                    retention = currentMonthData.retention;
+                } else {
+                    // Fallback to averages if current month not available
+                    var totalServices = 0, totalProducts = 0, totalRetention = 0;
+                    for (var j = 0; j < barberRows.length; j++) {
+                        totalServices += barberRows[j].services;
+                        totalProducts += barberRows[j].products;
+                        totalRetention += barberRows[j].retention;
+                    }
+                    
+                    services = totalServices / barberRows.length;
+                    products = totalProducts / barberRows.length;
+                    retention = totalRetention / barberRows.length;
+                }
                 
                 // Determine current tier
                 var startingTier = barberRows[0].startingtier || 1;
@@ -737,12 +1119,12 @@
                 }
                 
                 // Calculate overall score (weighted combination)
-                var overallScore = (avgServices * 0.4) + (avgProducts * 8) + (avgRetention * 0.6) + (currentTier * 50);
+                var overallScore = (services * 0.4) + (products * 8) + (retention * 0.6) + (currentTier * 50);
                 
                 stats[barber] = {
-                    services: avgServices,
-                    products: avgProducts,
-                    retention: avgRetention,
+                    services: services,
+                    products: products,
+                    retention: retention,
                     tier: currentTier,
                     overall: overallScore
                 };
