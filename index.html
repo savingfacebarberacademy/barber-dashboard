@@ -1021,6 +1021,12 @@
                     var isYou = barber === currentBarber;
                     var isTop3 = i < 3;
                     
+                    // Get barber's location
+                    var barberRow = barberData.find(function(row) {
+                        return row.name === barber;
+                    });
+                    var location = barberRow ? barberRow.location : 'Unknown';
+                    
                     var displayValue;
                     switch(metric) {
                         case 'services':
@@ -1037,15 +1043,16 @@
                             break;
                     }
                     
-                    var anonymousName = isYou ? 'You' : 'Barber ' + (i + 1);
+                    var displayName = isYou ? barber + ' (You)' : barber;
                     var rankEmoji = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '';
                     
                     var itemDiv = document.createElement('div');
                     itemDiv.className = 'leaderboard-item' + (isYou ? ' you' : '') + (isTop3 && !isYou ? ' top3' : '');
                     
                     itemDiv.innerHTML = 
-                        '<div><strong>' + rankEmoji + ' #' + (i + 1) + ' ' + anonymousName + '</strong></div>' +
-                        '<div>' + displayValue + ' | Tier ' + stat.tier + '</div>';
+                        '<div><strong>' + rankEmoji + ' #' + (i + 1) + ' ' + displayName + '</strong><br>' +
+                        '<span style="font-size: 0.9em; color: #666;">' + location + '</span></div>' +
+                        '<div>' + displayValue + '</div>';
                     
                     listContainer.appendChild(itemDiv);
                 }
