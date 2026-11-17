@@ -5,6 +5,7 @@ Writes markdown to the GitHub job summary (or prints it when run locally)."""
 
 import argparse
 import os
+import re
 import sys
 from collections import defaultdict
 
@@ -66,7 +67,12 @@ def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--account", choices=["main", "camillus"], default="camillus")
     ap.add_argument("--month", default="")
+    ap.add_argument("--start", default="", help="optional YYYY-MM-DD, overrides the month start")
+    ap.add_argument("--end", default="", help="optional YYYY-MM-DD, overrides the month end")
     a = ap.parse_args(argv)
+    for d in (a.start, a.end):
+        if d and not re.fullmatch(r"\d{4}-\d{2}-\d{2}", d):
+            raise SystemExit(f"Dates must look like YYYY-MM-DD, got {d!r}")
     month = a.month.strip() or ud.previous_month()
     ud.parse_month(month)
     secret = "SQUARE_MAIN_TOKEN" if a.account == "main" else "SQUARE_CAMILLUS_TOKEN"
@@ -75,6 +81,9 @@ def main(argv=None):
         print(f"ERROR: the {secret} secret is not set.", file=sys.stderr)
         return 2
     start, end = ud.month_bounds(month)
+    if a.start or a.end:
+        start, end = a.start or start, a.end or end
+        print(f"Custom date range: {start} to {end}")
     rows = ud.square_load(token, ud._ordered({
         "measures": ["ItemSales.items_sold_count", "ItemSales.net_quantity"],
         "dimensions": [
