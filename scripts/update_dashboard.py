@@ -45,6 +45,11 @@ PRODUCT_CATEGORIES_NEW = ["Apparel", "Product", "Saving Face Product", "Saving F
 PRODUCT_CATEGORIES_OLD = ["Apparel", "Product", "Saving Face Product", "Saving Face Retail"]
 NEW_PRODUCT_RULE_FROM = "2026-11"  # months before this used the old rule
 
+# The Camillus account has no service categories: every UNCATEGORIZED item is a service,
+# and every item that HAS a category counts as a product.
+ACCOUNTS_WITH_CATEGORIES = {"main"}
+UNCATEGORIZED = "Uncategorized"
+
 NAME_MAP = {
     "MK Welch": "M.K. Welch",
     "josh kowaleski": "Josh Kowaleski",
@@ -71,6 +76,23 @@ def clean_location(raw: str | None) -> str:
 
 def ignored(name: str, account: str) -> bool:
     return not name or name in IGNORE_ALWAYS or name in IGNORE_BY_ACCOUNT.get(account, set())
+
+
+def is_uncategorized(category) -> bool:
+    c = (category or "").strip()
+    return not c or c == UNCATEGORIZED
+
+
+def is_service(category, account: str) -> bool:
+    if account in ACCOUNTS_WITH_CATEGORIES:
+        return category in SERVICE_CATEGORIES
+    return is_uncategorized(category)
+
+
+def is_product(category, account: str, rule: str) -> bool:
+    if account in ACCOUNTS_WITH_CATEGORIES:
+        return category in (PRODUCT_CATEGORIES_OLD if rule == "old" else PRODUCT_CATEGORIES_NEW)
+    return not is_uncategorized(category)
 
 
 def num(v) -> float:
@@ -167,10 +189,20 @@ def _ordered(query: dict) -> dict:
     return query
 
 
-def services_query(month: str) -> dict:
+def _category_filter(query: dict, account: str, categories: list[str]) -> dict:
+    # Main account: filter by category name in Square. Camillus: pull every category and
+    # sort services (uncategorized) from products (categorized) in code.
+    if account not in ACCOUNTS_WITH_CATEGORIES:
+        query.pop("filters", None)
+    else:
+        query["filters"] = [{"member": "ItemSales.category_name", "operator": "equals", "values": categories}]
+    return query
+
+
+def services_query(month: str, account: str = "main") -> dict:
     start, end = month_bounds(month)
     # reporting_day is already a local date: do NOT pass a timezone.
-    return _ordered({
+    return _category_filter(_ordered({
         "measures": ["ItemSales.items_sold_count"],
         "dimensions": [
             "ItemSales.team_member_performed_by_name",
@@ -179,14 +211,13 @@ def services_query(month: str) -> dict:
             "ItemSales.category_name",
         ],
         "timeDimensions": [{"dimension": "ItemSales.reporting_day", "dateRange": [start, end]}],
-        "filters": [{"member": "ItemSales.category_name", "operator": "equals", "values": SERVICE_CATEGORIES}],
-    })
+    }), account, SERVICE_CATEGORIES)
 
 
-def products_query(month: str, rule: str) -> dict:
+def products_query(month: str, rule: str, account: str = "main") -> dict:
     start, end = month_bounds(month)
     cats = PRODUCT_CATEGORIES_OLD if rule == "old" else PRODUCT_CATEGORIES_NEW
-    return _ordered({
+    return _category_filter(_ordered({
         "measures": ["ItemSales.items_sold_count", "ItemSales.net_quantity"],
         "dimensions": [
             "ItemSales.team_member_attributed_to_name",
@@ -194,8 +225,7 @@ def products_query(month: str, rule: str) -> dict:
             "ItemSales.category_name",
         ],
         "timeDimensions": [{"dimension": "ItemSales.reporting_day", "dateRange": [start, end]}],
-        "filters": [{"member": "ItemSales.category_name", "operator": "equals", "values": cats}],
-    })
+    }), account, cats)
 
 
 def appointments_query(start: str, end: str) -> dict:
@@ -217,7 +247,7 @@ def compute_services(rows: list[dict], account: str):
     """-> {barber: {location: services}}  (items_sold_count, not net of refunds)."""
     out: dict[str, dict[str, float]] = defaultdict(lambda: defaultdict(float))
     for r in rows:
-        if r.get("ItemSales.category_name") not in SERVICE_CATEGORIES:
+        if not is_service(r.get("ItemSales.category_name"), account):
             continue
         who = (r.get("ItemSales.team_member_performed_by_name") or "").strip() \
             or (r.get("ItemSales.team_member_attributed_to_name") or "").strip()
@@ -229,11 +259,10 @@ def compute_services(rows: list[dict], account: str):
 
 
 def compute_products(rows: list[dict], account: str, rule: str) -> dict[str, float]:
-    cats = PRODUCT_CATEGORIES_OLD if rule == "old" else PRODUCT_CATEGORIES_NEW
     measure = "ItemSales.items_sold_count" if rule == "old" else "ItemSales.net_quantity"
     out: dict[str, float] = defaultdict(float)
     for r in rows:
-        if r.get("ItemSales.category_name") not in cats:
+        if not is_product(r.get("ItemSales.category_name"), account, rule):
             continue
         name = clean_name(r.get("ItemSales.team_member_attributed_to_name"))
         if ignored(name, account):
@@ -275,8 +304,8 @@ def pull_account(token: str, account: str, month: str, rule: str, fetch=square_l
     prior_start, _ = month_bounds(add_months(month, -12))
     _, prior_end = month_bounds(add_months(month, -1))
 
-    services = compute_services(fetch(token, services_query(month)), account)
-    products = compute_products(fetch(token, products_query(month, rule)), account, rule)
+    services = compute_services(fetch(token, services_query(month, account)), account)
+    products = compute_products(fetch(token, products_query(month, rule, account)), account, rule)
     retention = compute_retention(
         fetch(token, appointments_query(start, end)),
         fetch(token, appointments_query(prior_start, prior_end)),  # ~19k rows; processed here
