@@ -1,0 +1,66 @@
+name: Monthly dashboard update
+
+on:
+  schedule:
+    # 12:00 UTC (7 or 8 AM in New York) on the 2nd of every month.
+    - cron: "0 12 2 * *"
+  workflow_dispatch:
+    inputs:
+      month:
+        description: "Month to compute as YYYY-MM (leave blank for last month)"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: dashboard-update
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Pull Square data and update history.csv
+        id: update
+        env:
+          SQUARE_MAIN_TOKEN: ${{ secrets.SQUARE_MAIN_TOKEN }}
+          SQUARE_CAMILLUS_TOKEN: ${{ secrets.SQUARE_CAMILLUS_TOKEN }}
+          MONTH_INPUT: ${{ github.event.inputs.month }}
+        run: |
+          python scripts/update_dashboard.py \
+            --month "$MONTH_INPUT" \
+            --pr-body "$RUNNER_TEMP/pr_body.md"
+
+      - name: Open or update the pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MONTH: ${{ steps.update.outputs.month }}
+          TITLE: ${{ steps.update.outputs.title }}
+        run: |
+          branch="dashboard-update/$MONTH"
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -B "$branch"
+          git add data/history.csv
+          if git diff --cached --quiet; then
+            echo "history.csv is unchanged; the PR body still records the run."
+            git commit --allow-empty -m "$TITLE (no data changes)"
+          else
+            git commit -m "$TITLE"
+          fi
+          git push --force origin "$branch"
+          existing=$(gh pr list --head "$branch" --base main --state open --json number --jq '.[0].number')
+          if [ -n "$existing" ]; then
+            gh pr edit "$existing" --title "$TITLE" --body-file "$RUNNER_TEMP/pr_body.md"
+          else
+            gh pr create --base main --head "$branch" --title "$TITLE" --body-file "$RUNNER_TEMP/pr_body.md"
+          fi
