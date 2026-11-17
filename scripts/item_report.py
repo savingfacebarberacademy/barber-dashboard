@@ -39,13 +39,13 @@ def report(rows, account, month):
         all_items[(cat(r), item(r), kind(r))][1] += net(r)
         locations[(r.get("ItemSales.location_name") or "").strip()] += sold(r)
         c = r.get("ItemSales.category_name")
-        if ud.is_service(c, account):
+        if ud.is_service(c, account, r.get("ItemSales.item_name"), r.get("ItemSales.line_item_type")):
             who = (r.get("ItemSales.team_member_performed_by_name") or "").strip() \
                 or (r.get("ItemSales.team_member_attributed_to_name") or "").strip()
             name = ud.clean_name(who)
             if not ud.ignored(name, account):
                 services[(name, item(r), kind(r))] += sold(r)
-        if ud.is_product(c, account, "old"):
+        if ud.is_product(c, account, "old", r.get("ItemSales.item_name")):
             name = ud.clean_name(r.get("ItemSales.team_member_attributed_to_name"))
             if not ud.ignored(name, account):
                 products[(name, cat(r), item(r))][0] += sold(r)
