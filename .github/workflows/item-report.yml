@@ -12,6 +12,14 @@ on:
         description: "Month as YYYY-MM (leave blank for last month)"
         required: false
         default: ""
+      start:
+        description: "Optional start date YYYY-MM-DD (overrides the month)"
+        required: false
+        default: ""
+      end:
+        description: "Optional end date YYYY-MM-DD (overrides the month)"
+        required: false
+        default: ""
 
 permissions:
   contents: read
@@ -32,4 +40,8 @@ jobs:
           SQUARE_CAMILLUS_TOKEN: ${{ secrets.SQUARE_CAMILLUS_TOKEN }}
           ACCOUNT: ${{ github.event.inputs.account }}
           MONTH_INPUT: ${{ github.event.inputs.month }}
-        run: python scripts/item_report.py --account "$ACCOUNT" --month "$MONTH_INPUT"
+          START_INPUT: ${{ github.event.inputs.start }}
+          END_INPUT: ${{ github.event.inputs.end }}
+        run: >-
+          python scripts/item_report.py --account "$ACCOUNT" --month "$MONTH_INPUT"
+          --start "$START_INPUT" --end "$END_INPUT"
