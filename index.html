@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Saving Face barber dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#272727; --gold:#FFC956; --gold-ink:#272727;
+  --bg:#F4F4F2; --panel:#FFFFFF; --muted:#6B7178; --rule:#DADAD6;
+  --board:#272727; --board-text:#F4F4F2; --board-muted:#A7ABB0;
+  --bar:#272727; --focus:#B07A00;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --ink:#EDEDEA; --bg:#1B1B1B; --panel:#242424; --muted:#A3A8AE; --rule:#3A3A3A;
+    --board:#111111; --board-text:#F4F4F2; --board-muted:#9DA2A8;
+    --bar:#FFC956; --focus:#FFC956; color-scheme:dark;
+  }
+}
+*{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{
+  margin:0; background:var(--bg); color:var(--ink);
+  font:400 16px/1.5 "Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;
+  padding:env(safe-area-inset-top,0px) 0 env(safe-area-inset-bottom,0px);
+}
+.wrap{max-width:1120px; margin:0 auto; padding:0 20px}
+h1,h2,h3,.num{font-family:"Barlow Condensed","Arial Narrow",sans-serif}
+header{padding:28px 0 20px; border-bottom:1px solid var(--rule)}
+.brand{display:flex; flex-wrap:wrap; align-items:baseline; justify-content:space-between; gap:12px 24px}
+h1{margin:0; font-size:clamp(2rem,5vw,3rem); font-weight:700; line-height:1; letter-spacing:.01em}
+h1 span{display:inline-block; background:var(--gold); color:var(--gold-ink); padding:0 .18em}
+.controls{display:flex; flex-wrap:wrap; gap:10px; align-items:center}
+label.sel{display:flex; flex-direction:column; font-size:.8rem; color:var(--muted); gap:2px}
+select{
+  font:inherit; font-size:1rem; color:var(--ink); background:var(--panel);
+  border:1px solid var(--rule); border-radius:6px; padding:6px 10px; min-width:11rem;
+}
+.chips{display:flex; flex-wrap:wrap; gap:6px; margin-top:18px}
+.chip{
+  font:500 .95rem "Barlow",sans-serif; color:var(--ink); background:transparent;
+  border:1px solid var(--rule); border-radius:999px; padding:4px 14px; cursor:pointer;
+}
+.chip[aria-pressed="true"]{background:var(--ink); color:var(--bg); border-color:var(--ink)}
+:focus-visible{outline:3px solid var(--focus); outline-offset:2px}
+
+section{padding:32px 0}
+h2{font-size:1.9rem; font-weight:600; margin:0 0 4px}
+.sub{color:var(--muted); margin:0 0 20px; max-width:70ch}
+
+/* The standings board: the one loud element */
+.board{
+  background:var(--board); color:var(--board-text); border-radius:4px;
+  display:grid; grid-template-columns:repeat(3,1fr);
+}
+.col{padding:20px 22px 24px; border-left:1px solid #3A3A3A}
+.col:first-child{border-left:0}
+.col h3{margin:0 0 12px; font-size:1.5rem; font-weight:600; color:var(--gold)}
+.col h3 small{font:400 .85rem "Barlow",sans-serif; color:var(--board-muted); margin-left:6px}
+ol{list-style:none; margin:0; padding:0}
+ol li{display:grid; grid-template-columns:2ch 1fr auto; gap:10px; align-items:baseline; padding:5px 0; border-top:1px solid #333}
+ol li:first-child{border-top:0}
+.rank{color:var(--board-muted); font-size:.85rem; text-align:right}
+.who{min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.who em{font-style:normal; color:var(--board-muted); font-size:.82rem; margin-left:6px}
+.num{font-size:1.45rem; font-weight:600; line-height:1; font-variant-numeric:tabular-nums}
+li.top .num{background:var(--gold); color:#272727; padding:2px 8px; border-radius:3px}
+li.blank .num{color:var(--board-muted)}
+
+/* Barber history */
+.history-head{display:flex; flex-wrap:wrap; justify-content:space-between; align-items:end; gap:12px; margin-bottom:16px}
+.avg{display:flex; gap:28px; flex-wrap:wrap; margin:0 0 20px}
+.avg div{display:flex; flex-direction:column}
+.avg .num{font-size:2.2rem}
+.avg span{color:var(--muted); font-size:.85rem}
+.charts{display:grid; grid-template-columns:repeat(3,1fr); gap:20px}
+.chart{background:var(--panel); border:1px solid var(--rule); border-radius:4px; padding:16px}
+.chart h3{margin:0 0 10px; font-size:1.2rem; font-weight:600}
+.bars{display:grid; grid-template-columns:repeat(12,1fr); gap:4px; align-items:end; height:120px}
+.bars div{background:var(--bar); border-radius:2px 2px 0 0; min-height:2px; position:relative}
+.bars div.gap{background:repeating-linear-gradient(45deg,var(--rule) 0 3px,transparent 3px 6px); height:100%!important; opacity:.6}
+.axis{display:grid; grid-template-columns:repeat(12,1fr); gap:4px; font-size:.7rem; color:var(--muted); text-align:center; margin-top:4px}
+.tablewrap{overflow-x:auto; margin-top:24px}
+table{border-collapse:collapse; width:100%; min-width:520px; font-variant-numeric:tabular-nums}
+th,td{padding:8px 10px; text-align:right; border-bottom:1px solid var(--rule)}
+th:first-child,td:first-child,th:nth-child(2),td:nth-child(2){text-align:left}
+th{font-weight:600; color:var(--muted); font-size:.85rem}
+.note{color:var(--muted); font-size:.85rem; margin-top:28px; max-width:70ch}
+.err{background:var(--panel); border:1px solid var(--rule); padding:16px; border-radius:4px}
+
+@media (max-width:820px){
+  .board,.charts{grid-template-columns:1fr}
+  .col{border-left:0; border-top:1px solid #3A3A3A}
+  .col:first-child{border-top:0}
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <div class="brand">
+      <h1><span>Saving Face</span> barber dashboard</h1>
+      <div class="controls">
+        <label class="sel">Month<select id="month"></select></label>
+      </div>
+    </div>
+    <div class="chips" id="chips" role="group" aria-label="Filter by shop"></div>
+  </div>
+</header>
+
+<main class="wrap">
+  <section aria-labelledby="standings-title">
+    <h2 id="standings-title">Standings</h2>
+    <p class="sub" id="standings-sub"></p>
+    <div class="board" id="board"></div>
+  </section>
+
+  <section aria-labelledby="history-title">
+    <div class="history-head">
+      <div>
+        <h2 id="history-title">One barber, month by month</h2>
+        <p class="sub" id="history-sub" style="margin:0">Pick a barber to see their last twelve months.</p>
+      </div>
+      <label class="sel">Barber<select id="barber"></select></label>
+    </div>
+    <div class="avg" id="avg"></div>
+    <div class="charts" id="charts"></div>
+    <div class="tablewrap"><table id="table"></table></div>
+    <p class="note">Services count every service performed, credited to the barber the client was booked with. Products count retail items sold, net of refunds from November 2026 on. Retention is the share of this month's clients who also saw the same barber in the previous twelve months. Updated monthly.</p>
+  </section>
+</main>
+
+<script>
+const SHOPS=["Baldwinsville","Camillus","Manlius","Marcellus","Saratoga"];
+const METRICS=[
+  {key:"services",label:"Services",unit:""},
+  {key:"products",label:"Products",unit:""},
+  {key:"retention",label:"Retention",unit:"%"}
+];
+let rows=[], shop="All";
+
+function parseCSV(text){
+  const lines=text.trim().split(/\r?\n/), head=lines.shift().split(",");
+  return lines.map(l=>{
+    const v=l.split(","), o={};
+    head.forEach((h,i)=>{
+      const x=(v[i]??"").trim();
+      o[h]=["services","products","retention"].includes(h)?(x===""?null:Number(x)):x;
+    });
+    return o;
+  });
+}
+const monthName=m=>new Date(m+"-01T12:00:00").toLocaleDateString("en-US",{month:"long",year:"numeric"});
+const monthShort=m=>new Date(m+"-01T12:00:00").toLocaleDateString("en-US",{month:"short"});
+const fmt=(v,u)=>v==null?"—":v+u;
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+function renderChips(){
+  const el=document.getElementById("chips");
+  el.innerHTML=["All",...SHOPS].map(s=>`<button class="chip" aria-pressed="${s===shop}" data-shop="${s}">${s==="All"?"All shops":s}</button>`).join("");
+  el.querySelectorAll("button").forEach(b=>b.onclick=()=>{shop=b.dataset.shop; renderChips(); renderBoard();});
+}
+
+function renderBoard(){
+  const m=document.getElementById("month").value;
+  const list=rows.filter(r=>r.month===m&&(shop==="All"||r.location===shop));
+  document.getElementById("standings-sub").textContent=
+    `${monthName(m)}, ${shop==="All"?"all shops":shop}. ${list.length} barbers.`;
+  document.getElementById("board").innerHTML=METRICS.map(({key,label,unit})=>{
+    const sorted=[...list].sort((a,b)=>(b[key]??-1)-(a[key]??-1)||a.barber.localeCompare(b.barber));
+    let rank=0,prev;
+    const items=sorted.map((r,i)=>{
+      if(r[key]!==prev){rank=i+1; prev=r[key];}
+      const cls=r[key]==null?"blank":(rank===1?"top":"");
+      return `<li class="${cls}"><span class="rank">${r[key]==null?"":rank}</span>
+        <span class="who">${esc(r.barber)}${shop==="All"?`<em>${esc(r.location)}</em>`:""}</span>
+        <span class="num">${fmt(r[key],unit)}</span></li>`;
+    }).join("");
+    return `<div class="col"><h3>${label}</h3><ol>${items||'<li><span></span><span class="who">No data for this month.</span><span></span></li>'}</ol></div>`;
+  }).join("");
+}
+
+function renderBarber(){
+  const name=document.getElementById("barber").value;
+  const months=[...new Set(rows.map(r=>r.month))].sort().slice(-12);
+  const mine=Object.fromEntries(rows.filter(r=>r.barber===name).map(r=>[r.month,r]));
+  const latest=[...months].reverse().map(m=>mine[m]).find(Boolean);
+  document.getElementById("history-sub").textContent=latest?`${name}, ${latest.location}.`:name;
+
+  document.getElementById("avg").innerHTML=METRICS.map(({key,label,unit})=>{
+    const vals=months.map(m=>mine[m]?.[key]).filter(v=>v!=null);
+    const a=vals.length?Math.round(vals.reduce((s,v)=>s+v,0)/vals.length):null;
+    return `<div><span class="num">${fmt(a,unit)}</span><span>${label}, 12-month average</span></div>`;
+  }).join("");
+
+  document.getElementById("charts").innerHTML=METRICS.map(({key,label,unit})=>{
+    const vals=months.map(m=>mine[m]?.[key]??null);
+    const max=key==="retention"?100:Math.max(1,...vals.filter(v=>v!=null));
+    const bars=vals.map((v,i)=>v==null
+      ?`<div class="gap" title="${monthName(months[i])}: no data"></div>`
+      :`<div style="height:${Math.max(2,v/max*100)}%" title="${monthName(months[i])}: ${v}${unit}"></div>`).join("");
+    return `<div class="chart"><h3>${label}</h3><div class="bars" role="img" aria-label="${label} by month">${bars}</div>
+      <div class="axis">${months.map(m=>`<span>${monthShort(m)[0]}</span>`).join("")}</div></div>`;
+  }).join("");
+
+  document.getElementById("table").innerHTML=
+    `<thead><tr><th>Month</th><th>Shop</th>${METRICS.map(x=>`<th>${x.label}</th>`).join("")}</tr></thead><tbody>`+
+    [...months].reverse().map(m=>{const r=mine[m];
+      return `<tr><td>${monthName(m)}</td><td>${r?esc(r.location):"—"}</td>${METRICS.map(x=>`<td>${r?fmt(r[x.key],x.unit):"—"}</td>`).join("")}</tr>`;
+    }).join("")+`</tbody>`;
+}
+
+async function init(){
+  try{
+    const res=await fetch("data/history.csv",{cache:"no-store"});
+    if(!res.ok) throw new Error(res.status);
+    rows=parseCSV(await res.text());
+  }catch(e){
+    document.querySelector("main").innerHTML=`<div class="err" style="margin-top:32px">The data file data/history.csv could not be loaded. Check that it is in the repository next to index.html.</div>`;
+    return;
+  }
+  const months=[...new Set(rows.map(r=>r.month))].sort().reverse();
+  const ms=document.getElementById("month");
+  ms.innerHTML=months.map(m=>`<option value="${m}">${monthName(m)}</option>`).join("");
+  ms.onchange=renderBoard;
+
+  const recent=new Set(months.slice(0,12));
+  const names=[...new Set(rows.filter(r=>recent.has(r.month)).map(r=>r.barber))].sort();
+  const bs=document.getElementById("barber");
+  bs.innerHTML=names.map(n=>`<option>${esc(n)}</option>`).join("");
+  bs.onchange=renderBarber;
+
+  renderChips(); renderBoard(); renderBarber();
+}
+init();
+</script>
+</body>
+</html>
