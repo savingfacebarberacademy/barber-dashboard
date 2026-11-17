@@ -468,7 +468,19 @@ def main(argv=None) -> int:
     if cam_token:
         cam_rows = pull_account(cam_token, "camillus", month, rule)
         seen = {r["barber"] for r in new_rows}
-        new_rows += [r for r in cam_rows if r["barber"] not in seen]
+        cam_new = [r for r in cam_rows if r["barber"] not in seen]
+        if cam_new:
+            new_rows += cam_new
+        else:
+            # Never let an empty or wrong Camillus pull wipe out Camillus rows.
+            protect = {"Camillus"}
+            if cam_rows:
+                why = (f"every barber it returned ({len(cam_rows)}) is already in the main account, so the "
+                       "SQUARE_CAMILLUS_TOKEN secret probably holds the main account's token")
+            else:
+                why = "it returned no services at all (wrong token, a Sandbox token, or no data)"
+            notes.append("🚨 **Camillus NOT updated:** the Camillus Square account was queried, but " + why +
+                         ". Existing Camillus rows were left exactly as they were. Please check the secret.")
     else:
         protect = {"Camillus"}
         notes.append("⏭️ **Camillus skipped:** the SQUARE_CAMILLUS_TOKEN secret is not set, so Camillus "
