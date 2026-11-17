@@ -1,0 +1,35 @@
+name: Item report (check categories)
+
+on:
+  workflow_dispatch:
+    inputs:
+      account:
+        description: "Square account"
+        type: choice
+        options: [camillus, main]
+        default: camillus
+      month:
+        description: "Month as YYYY-MM (leave blank for last month)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: List items sold
+        env:
+          SQUARE_MAIN_TOKEN: ${{ secrets.SQUARE_MAIN_TOKEN }}
+          SQUARE_CAMILLUS_TOKEN: ${{ secrets.SQUARE_CAMILLUS_TOKEN }}
+          ACCOUNT: ${{ github.event.inputs.account }}
+          MONTH_INPUT: ${{ github.event.inputs.month }}
+        run: python scripts/item_report.py --account "$ACCOUNT" --month "$MONTH_INPUT"
