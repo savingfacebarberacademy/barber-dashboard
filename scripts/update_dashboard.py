@@ -45,10 +45,17 @@ PRODUCT_CATEGORIES_NEW = ["Apparel", "Product", "Saving Face Product", "Saving F
 PRODUCT_CATEGORIES_OLD = ["Apparel", "Product", "Saving Face Product", "Saving Face Retail"]
 NEW_PRODUCT_RULE_FROM = "2026-11"  # months before this used the old rule
 
-# The Camillus account has no service categories: every UNCATEGORIZED item is a service,
-# and every item that HAS a category counts as a product.
+# The Camillus account has no service categories (rule applies from Nov 2026; earlier Camillus
+# rows in history.csv are never recomputed):
+#   services = UNCATEGORIZED items, except gift cards, no-show fees and discounts
+#   products = "Hair Care" items, except haircuts that were filed there by mistake
+#   "Add-on services" count as neither.
 ACCOUNTS_WITH_CATEGORIES = {"main"}
 UNCATEGORIZED = "Uncategorized"
+CAMILLUS_RULES_FROM = "2026-11"
+CAMILLUS_PRODUCT_CATEGORIES = ["Hair Care"]
+CAMILLUS_NOT_SERVICES = re.compile(r"no.?show|discount|gift ?card", re.I)
+CAMILLUS_NOT_PRODUCTS = re.compile(r"\bcut\b", re.I)
 
 NAME_MAP = {
     "MK Welch": "M.K. Welch",
@@ -58,7 +65,11 @@ NAME_MAP = {
 IGNORE_ALWAYS = {"Taylor Horsman"}
 IGNORE_BY_ACCOUNT = {"main": {"Alex Mott"}}  # Alex Mott is reported from the Camillus account
 
-LOCATION_MAP = {"B'Ville": "Baldwinsville", "B’Ville": "Baldwinsville"}
+LOCATION_MAP = {
+    "B'Ville": "Baldwinsville",
+    "B’Ville": "Baldwinsville",
+    "Saving Face Barbershop - Camillus": "Camillus",
+}
 
 CHANGE_FLAG_PCT = 40
 CSV_COLUMNS = ["month", "barber", "location", "services", "products", "retention"]
@@ -83,16 +94,20 @@ def is_uncategorized(category) -> bool:
     return not c or c == UNCATEGORIZED
 
 
-def is_service(category, account: str) -> bool:
+def is_service(category, account: str, item=None, kind=None) -> bool:
     if account in ACCOUNTS_WITH_CATEGORIES:
         return category in SERVICE_CATEGORIES
+    if (kind or "").strip().upper() == "GIFT_CARD" or CAMILLUS_NOT_SERVICES.search(item or ""):
+        return False
     return is_uncategorized(category)
 
 
-def is_product(category, account: str, rule: str) -> bool:
+def is_product(category, account: str, rule: str, item=None) -> bool:
     if account in ACCOUNTS_WITH_CATEGORIES:
         return category in (PRODUCT_CATEGORIES_OLD if rule == "old" else PRODUCT_CATEGORIES_NEW)
-    return not is_uncategorized(category)
+    if CAMILLUS_NOT_PRODUCTS.search(item or ""):
+        return False
+    return (category or "").strip() in CAMILLUS_PRODUCT_CATEGORIES
 
 
 def num(v) -> float:
@@ -194,6 +209,8 @@ def _category_filter(query: dict, account: str, categories: list[str]) -> dict:
     # sort services (uncategorized) from products (categorized) in code.
     if account not in ACCOUNTS_WITH_CATEGORIES:
         query.pop("filters", None)
+        query["dimensions"] += ["ItemSales.item_name", "ItemSales.line_item_type"]
+        query["order"] = [[d, "asc"] for d in query["dimensions"]]
     else:
         query["filters"] = [{"member": "ItemSales.category_name", "operator": "equals", "values": categories}]
     return query
@@ -247,7 +264,8 @@ def compute_services(rows: list[dict], account: str):
     """-> {barber: {location: services}}  (items_sold_count, not net of refunds)."""
     out: dict[str, dict[str, float]] = defaultdict(lambda: defaultdict(float))
     for r in rows:
-        if not is_service(r.get("ItemSales.category_name"), account):
+        if not is_service(r.get("ItemSales.category_name"), account,
+                          r.get("ItemSales.item_name"), r.get("ItemSales.line_item_type")):
             continue
         who = (r.get("ItemSales.team_member_performed_by_name") or "").strip() \
             or (r.get("ItemSales.team_member_attributed_to_name") or "").strip()
@@ -262,7 +280,7 @@ def compute_products(rows: list[dict], account: str, rule: str) -> dict[str, flo
     measure = "ItemSales.items_sold_count" if rule == "old" else "ItemSales.net_quantity"
     out: dict[str, float] = defaultdict(float)
     for r in rows:
-        if not is_product(r.get("ItemSales.category_name"), account, rule):
+        if not is_product(r.get("ItemSales.category_name"), account, rule, r.get("ItemSales.item_name")):
             continue
         name = clean_name(r.get("ItemSales.team_member_attributed_to_name"))
         if ignored(name, account):
@@ -494,7 +512,11 @@ def main(argv=None) -> int:
     notes = []
     new_rows = pull_account(main_token, "main", month, rule)
     protect = set()
-    if cam_token:
+    if month < CAMILLUS_RULES_FROM:
+        protect = {"Camillus"}
+        notes.append(f"⏭️ **Camillus left as it was:** Camillus numbers before {month_label(CAMILLUS_RULES_FROM)} "
+                     "were made a different way and are never recomputed.")
+    elif cam_token:
         cam_rows = pull_account(cam_token, "camillus", month, rule)
         seen = {r["barber"] for r in new_rows}
         cam_new = [r for r in cam_rows if r["barber"] not in seen]
