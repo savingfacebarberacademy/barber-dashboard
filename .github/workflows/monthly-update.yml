@@ -14,6 +14,8 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  issues: write
+  pages: write
 
 concurrency:
   group: dashboard-update
@@ -64,3 +66,47 @@ jobs:
           else
             gh pr create --base main --head "$branch" --title "$TITLE" --body-file "$RUNNER_TEMP/pr_body.md"
           fi
+
+      - name: Publish (merge the pull request)
+        id: publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MONTH: ${{ steps.update.outputs.month }}
+        run: |
+          gh pr merge "dashboard-update/$MONTH" --squash --delete-branch
+          # Ask GitHub Pages to rebuild so the dashboard shows the new month right away.
+          gh api -X POST "repos/$GITHUB_REPOSITORY/pages/builds" > /dev/null \
+            || echo "Could not request a Pages build; Pages normally rebuilds on its own."
+
+      - name: Build the alert
+        if: always() && steps.update.outcome == 'success'
+        id: alert
+        env:
+          MONTH: ${{ steps.update.outputs.month }}
+          OWNER: ${{ github.repository_owner }}
+          DASHBOARD_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/
+        run: |
+          python scripts/alerts.py --month "$MONTH" --pr-body "$RUNNER_TEMP/pr_body.md" \
+            --out "$RUNNER_TEMP/alert.md" --mention "$OWNER" --dashboard-url "$DASHBOARD_URL"
+
+      - name: Send the alert (GitHub emails the owner)
+        if: always() && steps.alert.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MONTH: ${{ steps.update.outputs.month }}
+          OWNER: ${{ github.repository_owner }}
+          CHECKS: ${{ steps.alert.outputs.checks }}
+          PUBLISHED: ${{ steps.publish.outcome }}
+        run: |
+          label=$(date -d "$MONTH-01" "+%B %Y")
+          if [ "$PUBLISHED" != "success" ]; then
+            printf '🚨 **The update could NOT be published automatically.** Open the pull request for %s and merge it by hand.\n\n' "$label" \
+              | cat - "$RUNNER_TEMP/alert.md" > "$RUNNER_TEMP/alert2.md"
+            mv "$RUNNER_TEMP/alert2.md" "$RUNNER_TEMP/alert.md"
+            title="🚨 Dashboard NOT published — $label"
+          elif [ "${CHECKS:-0}" -gt 0 ]; then
+            title="📊 Dashboard published — $label ($CHECKS things to check)"
+          else
+            title="📊 Dashboard published — $label (all normal)"
+          fi
+          gh issue create --title "$title" --body-file "$RUNNER_TEMP/alert.md" --assignee "$OWNER"
