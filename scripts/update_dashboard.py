@@ -63,7 +63,7 @@ NAME_MAP = {
     "Taylor K": "Taylor Klein",
 }
 IGNORE_ALWAYS = {"Taylor Horsman"}
-IGNORE_BY_ACCOUNT = {"main": {"Alex Mott"}}  # Alex Mott is reported from the Camillus account
+IGNORE_BY_ACCOUNT = {"main": {"Alex Mott"}, "camillus": {"Anthony Nappa", "Dylan Sweet", "Jon Pettitt"}}
 
 LOCATION_MAP = {
     "B'Ville": "Baldwinsville",
